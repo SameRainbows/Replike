@@ -8,7 +8,13 @@ import {
 } from "@mediapipe/tasks-vision";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type ExerciseId = "jumping_jacks" | "squats" | "lunges" | "high_knees";
+type ExerciseId =
+  | "jumping_jacks"
+  | "squats"
+  | "lunges"
+  | "high_knees"
+  | "pull_ups"
+  | "chin_ups";
 
 type RepState = {
   exercise: ExerciseId;
@@ -19,6 +25,14 @@ type RepState = {
   reachedTarget: boolean;
   lastSide: "left" | "right" | "none";
   feedback: string;
+};
+
+type BarLine = {
+  // Normalized (0..1) screen-space coordinates relative to the video.
+  // We treat the bar as horizontal and use y as the main signal.
+  y: number;
+  x1: number;
+  x2: number;
 };
 
 function formatUnknownError(e: unknown) {
@@ -56,6 +70,10 @@ function formatUnknownError(e: unknown) {
   } catch {
     return String(e);
   }
+}
+
+function clamp(x: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, x));
 }
 
 function clamp01(x: number) {
@@ -438,10 +456,120 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
   };
 }
 
+function updateBarExerciseState(
+  prev: RepState,
+  landmarks: NormalizedLandmark[],
+  nowMs: number,
+  bar: BarLine | null,
+  label: "Pull-ups" | "Chin-ups"
+): RepState {
+  if (!bar) {
+    return {
+      ...prev,
+      phase: "unknown",
+      feedback: `Set the bar line to start counting ${label.toLowerCase()}.`,
+    };
+  }
+
+  const mouthL = getLandmark(landmarks, 9);
+  const mouthR = getLandmark(landmarks, 10);
+  const lWrist = getLandmark(landmarks, 15);
+  const rWrist = getLandmark(landmarks, 16);
+  const lShoulder = getLandmark(landmarks, 11);
+  const rShoulder = getLandmark(landmarks, 12);
+  const lElbow = getLandmark(landmarks, 13);
+  const rElbow = getLandmark(landmarks, 14);
+
+  const minVisible =
+    isLandmarkConfident(mouthL, 0.35) &&
+    isLandmarkConfident(mouthR, 0.35) &&
+    isLandmarkConfident(lWrist, 0.35) &&
+    isLandmarkConfident(rWrist, 0.35) &&
+    isLandmarkConfident(lShoulder, 0.35) &&
+    isLandmarkConfident(rShoulder, 0.35) &&
+    isLandmarkConfident(lElbow, 0.35) &&
+    isLandmarkConfident(rElbow, 0.35);
+
+  if (!minVisible) {
+    return {
+      ...prev,
+      phase: "unknown",
+      feedback: "Make sure your face and arms are visible.",
+    };
+  }
+
+  const mouthY = avg(mouthL!.y, mouthR!.y);
+  const wristsY = avg(lWrist!.y, rWrist!.y);
+  const wristNearBar = Math.abs(wristsY - bar.y) < 0.12;
+
+  const lElbowAngle = angleDeg(lShoulder!, lElbow!, lWrist!);
+  const rElbowAngle = angleDeg(rShoulder!, rElbow!, rWrist!);
+  const elbowAngle = Math.min(lElbowAngle, rElbowAngle);
+
+  const topEnter = 0.015;
+  const topExit = 0.005;
+  const chinAboveBar = prev.phase === "up" ? mouthY < bar.y - topExit : mouthY < bar.y - topEnter;
+
+  const bottomEnter = 165;
+  const bottomExit = 155;
+  const elbowsExtended = prev.phase === "down" ? elbowAngle > bottomExit : elbowAngle > bottomEnter;
+
+  const minRepMs = 900;
+  const minPhaseMs = 200;
+  const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
+
+  let nextPhase = prev.phase;
+  if (prev.phase === "unknown") {
+    nextPhase = chinAboveBar ? "up" : "down";
+  } else if (canSwitch) {
+    if (prev.phase === "down" && chinAboveBar && wristNearBar) nextPhase = "up";
+    if (prev.phase === "up" && elbowsExtended && wristNearBar) nextPhase = "down";
+  }
+
+  let repCount = prev.repCount;
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let feedback = prev.feedback;
+
+  if (!wristNearBar) {
+    feedback = "Hands must stay on the bar (wrists near the bar line).";
+  } else if (chinAboveBar) {
+    feedback = "Top reached. Lower with control to full extension.";
+  } else if (!elbowsExtended) {
+    feedback = "Go to full extension at the bottom to count.";
+  } else {
+    feedback = "Pull until your chin clears the bar.";
+  }
+
+  if (nextPhase === "up") reachedTarget = true;
+
+  if (prev.phase === "up" && nextPhase === "down") {
+    if (reachedTarget && elbowsExtended && wristNearBar && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+    }
+  }
+
+  return {
+    ...prev,
+    repCount,
+    phase: nextPhase,
+    lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    feedback,
+  };
+}
+
 export default function PoseRepCounter() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const smoothedRef = useRef<NormalizedLandmark[] | null>(null);
+  const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
+
+  const [barLine, setBarLine] = useState<BarLine | null>(null);
+  const [barDraft, setBarDraft] = useState<{ x: number; y: number } | null>(null);
 
   const [exercise, setExercise] = useState<ExerciseId>("jumping_jacks");
   const [status, setStatus] = useState<
@@ -459,6 +587,8 @@ export default function PoseRepCounter() {
     lastSide: "none",
     feedback: "",
   }));
+
+  const needsBar = exercise === "pull_ups" || exercise === "chin_ups";
 
   const displayPhase = useMemo(() => {
     if (repState.phase === "unknown") return "No pose";
@@ -480,7 +610,14 @@ export default function PoseRepCounter() {
       lastSide: "none",
       feedback: "",
     }));
+    setBarDraft(null);
   }, [exercise]);
+
+  useEffect(() => {
+    if (!needsBar) {
+      setBarDraft(null);
+    }
+  }, [needsBar]);
 
   useEffect(() => {
     let landmarker: PoseLandmarker | null = null;
@@ -580,6 +717,7 @@ export default function PoseRepCounter() {
             const raw = result.landmarks[0];
             const smoothed = smoothLandmarks(smoothedRef.current, raw, 0.25);
             smoothedRef.current = smoothed;
+            lastLandmarksRef.current = smoothed;
 
             drawingUtils.drawLandmarks(smoothed, {
               radius: (data) => 2 + 3 * clamp01(data.from?.z ? 0 : 1),
@@ -613,6 +751,10 @@ export default function PoseRepCounter() {
               if (exercise === "squats") return updateSquatState(prev, smoothed, nowMs);
               if (exercise === "lunges") return updateLungeState(prev, smoothed, nowMs);
               if (exercise === "high_knees") return updateHighKneesState(prev, smoothed, nowMs);
+              if (exercise === "pull_ups")
+                return updateBarExerciseState(prev, smoothed, nowMs, barLine, "Pull-ups");
+              if (exercise === "chin_ups")
+                return updateBarExerciseState(prev, smoothed, nowMs, barLine, "Chin-ups");
               return prev;
             });
           } else {
@@ -621,6 +763,20 @@ export default function PoseRepCounter() {
               phase: "unknown",
               feedback: "",
             }));
+          }
+
+          // Draw bar overlay if set
+          if (barLine) {
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.strokeStyle = "rgba(255, 210, 80, 0.95)";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(barLine.x1 * canvas.width, barLine.y * canvas.height);
+            ctx.lineTo(barLine.x2 * canvas.width, barLine.y * canvas.height);
+            ctx.stroke();
+            ctx.restore();
           }
 
           ctx.restore();
@@ -711,6 +867,8 @@ export default function PoseRepCounter() {
                 <option value="squats">Squats</option>
                 <option value="lunges">Lunges</option>
                 <option value="high_knees">High knees</option>
+                <option value="pull_ups">Pull-ups</option>
+                <option value="chin_ups">Chin-ups</option>
               </select>
             </div>
 
@@ -758,6 +916,62 @@ export default function PoseRepCounter() {
           >
             {repState.feedback || "Move into frame to begin."}
           </div>
+
+          {needsBar && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                Bar: {barLine ? "set" : "not set"}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBarLine(null);
+                  setBarDraft(null);
+                }}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Clear bar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const lms = lastLandmarksRef.current;
+                  if (!lms) return;
+                  const lWrist = getLandmark(lms, 15);
+                  const rWrist = getLandmark(lms, 16);
+                  if (!isLandmarkConfident(lWrist, 0.35) || !isLandmarkConfident(rWrist, 0.35)) return;
+                  const wristsY = avg(lWrist!.y, rWrist!.y);
+                  const y = clamp(wristsY - 0.02, 0.02, 0.98);
+                  setBarLine({ y, x1: 0.05, x2: 0.95 });
+                  setBarDraft(null);
+                }}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Auto-set bar
+              </button>
+
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                Tip: click the video twice to set the bar.
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
@@ -800,6 +1014,24 @@ export default function PoseRepCounter() {
           overflow: "hidden",
           border: "1px solid rgba(255,255,255,0.08)",
           background: "#05070c",
+        }}
+        onClick={(ev) => {
+          if (!needsBar) return;
+          const target = ev.currentTarget as HTMLDivElement;
+          const rect = target.getBoundingClientRect();
+          const x = clamp((ev.clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
+          const y = clamp((ev.clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
+
+          if (!barDraft) {
+            setBarDraft({ x, y });
+            return;
+          }
+
+          const x1 = clamp(barDraft.x, 0, 1);
+          const x2 = clamp(x, 0, 1);
+          const lineY = clamp((barDraft.y + y) / 2, 0.02, 0.98);
+          setBarLine({ y: lineY, x1: Math.min(x1, x2), x2: Math.max(x1, x2) });
+          setBarDraft(null);
         }}
       >
         <video
