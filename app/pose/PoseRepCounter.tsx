@@ -8,13 +8,17 @@ import {
 } from "@mediapipe/tasks-vision";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type ExerciseId = "jumping_jacks" | "squats";
+type ExerciseId = "jumping_jacks" | "squats" | "lunges" | "high_knees";
 
 type RepState = {
   exercise: ExerciseId;
   repCount: number;
   phase: "unknown" | "closed" | "open" | "up" | "down";
   lastPhaseChangeMs: number;
+  lastRepMs: number;
+  reachedTarget: boolean;
+  lastSide: "left" | "right" | "none";
+  feedback: string;
 };
 
 function formatUnknownError(e: unknown) {
@@ -95,6 +99,23 @@ function isLandmarkConfident(lm: NormalizedLandmark | null, minVis = 0.5) {
   return lm.visibility >= minVis;
 }
 
+function smoothLandmarks(
+  prev: NormalizedLandmark[] | null,
+  next: NormalizedLandmark[],
+  alpha: number
+): NormalizedLandmark[] {
+  if (!prev || prev.length !== next.length) return next.map((l) => ({ ...l }));
+  return next.map((n, i) => {
+    const p = prev[i] ?? n;
+    return {
+      ...n,
+      x: p.x + (n.x - p.x) * alpha,
+      y: p.y + (n.y - p.y) * alpha,
+      z: typeof n.z === "number" && typeof p.z === "number" ? p.z + (n.z - p.z) * alpha : n.z,
+    };
+  });
+}
+
 function updateJumpingJackState(
   prev: RepState,
   landmarks: NormalizedLandmark[],
@@ -157,6 +178,7 @@ function updateJumpingJackState(
   // Timing: ignore ultra-fast toggles from jitter
   const minPhaseMs = 180;
   const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
+  const minRepMs = 500;
 
   let nextPhase = prev.phase;
   if (prev.phase === "unknown") {
@@ -167,9 +189,24 @@ function updateJumpingJackState(
   }
 
   let repCount = prev.repCount;
-  // Count a rep when returning to closed after being open
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let feedback = prev.feedback;
+
+  if (nextPhase === "open") reachedTarget = true;
+
+  if (open) {
+    feedback = "Good. Fully extend arms and step wide.";
+  } else {
+    feedback = "Raise arms above head and step wider to count.";
+  }
+
   if (prev.phase === "open" && nextPhase === "closed") {
-    repCount += 1;
+    if (reachedTarget && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+    }
   }
 
   return {
@@ -177,6 +214,9 @@ function updateJumpingJackState(
     repCount,
     phase: nextPhase,
     lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    feedback,
   };
 }
 
@@ -210,6 +250,7 @@ function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   const downExit = 135;
   const upEnter = 165;
   const upExit = 155;
+  const minRepMs = 700;
 
   const isDown =
     prev.phase === "down"
@@ -233,20 +274,174 @@ function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   }
 
   let repCount = prev.repCount;
-  // Count when returning to up from down
-  if (prev.phase === "down" && nextPhase === "up") repCount += 1;
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let feedback = prev.feedback;
+
+  if (nextPhase === "down") reachedTarget = true;
+
+  if (kneeAngle < downEnter) {
+    feedback = "Good depth. Drive up.";
+  } else if (kneeAngle < 140) {
+    feedback = "Go a bit lower for a full rep.";
+  } else {
+    feedback = "Stand tall, then squat down.";
+  }
+
+  if (prev.phase === "down" && nextPhase === "up") {
+    if (reachedTarget && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+    }
+  }
 
   return {
     ...prev,
     repCount,
     phase: nextPhase,
     lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    feedback,
+  };
+}
+
+function updateLungeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+  const lHip = getLandmark(landmarks, 23);
+  const rHip = getLandmark(landmarks, 24);
+  const lKnee = getLandmark(landmarks, 25);
+  const rKnee = getLandmark(landmarks, 26);
+  const lAnkle = getLandmark(landmarks, 27);
+  const rAnkle = getLandmark(landmarks, 28);
+
+  const minVisible =
+    isLandmarkConfident(lHip, 0.4) &&
+    isLandmarkConfident(rHip, 0.4) &&
+    isLandmarkConfident(lKnee, 0.4) &&
+    isLandmarkConfident(rKnee, 0.4) &&
+    isLandmarkConfident(lAnkle, 0.4) &&
+    isLandmarkConfident(rAnkle, 0.4);
+
+  if (!minVisible) return { ...prev, phase: "unknown", feedback: "Step back so hips/knees/ankles are visible." };
+
+  const leftAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+  const rightAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+
+  const activeSide: "left" | "right" = leftAngle < rightAngle ? "left" : "right";
+  const activeAngle = Math.min(leftAngle, rightAngle);
+
+  const downEnter = 120;
+  const downExit = 140;
+  const upEnter = 170;
+  const upExit = 160;
+  const minPhaseMs = 220;
+  const minRepMs = 750;
+  const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
+
+  const isDown = prev.phase === "down" ? activeAngle < downExit : activeAngle < downEnter;
+  const isUp = prev.phase === "up" ? activeAngle > upExit : activeAngle > upEnter;
+
+  let nextPhase = prev.phase;
+  if (prev.phase === "unknown") nextPhase = isDown ? "down" : "up";
+  else if (canSwitch) {
+    if (prev.phase === "up" && isDown) nextPhase = "down";
+    if (prev.phase === "down" && isUp) nextPhase = "up";
+  }
+
+  let repCount = prev.repCount;
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let lastSide = prev.lastSide;
+
+  let feedback = prev.feedback;
+  if (activeAngle < downEnter) feedback = `Good lunge (${activeSide}). Push back up.`;
+  else if (activeAngle < 150) feedback = `Go a bit lower (${activeSide}) for a full rep.`;
+  else feedback = "Take a longer step and lunge down.";
+
+  if (nextPhase === "down") {
+    reachedTarget = true;
+    lastSide = activeSide;
+  }
+
+  if (prev.phase === "down" && nextPhase === "up") {
+    if (reachedTarget && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+    }
+  }
+
+  return {
+    ...prev,
+    repCount,
+    phase: nextPhase,
+    lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    lastSide,
+    feedback,
+  };
+}
+
+function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+  const lHip = getLandmark(landmarks, 23);
+  const rHip = getLandmark(landmarks, 24);
+  const lKnee = getLandmark(landmarks, 25);
+  const rKnee = getLandmark(landmarks, 26);
+
+  const minVisible =
+    isLandmarkConfident(lHip, 0.35) &&
+    isLandmarkConfident(rHip, 0.35) &&
+    isLandmarkConfident(lKnee, 0.35) &&
+    isLandmarkConfident(rKnee, 0.35);
+
+  if (!minVisible) return { ...prev, phase: "unknown", feedback: "Make sure hips and knees are visible." };
+
+  const hipY = avg(lHip!.y, rHip!.y);
+  const leftUp = lKnee!.y < hipY - 0.05;
+  const rightUp = rKnee!.y < hipY - 0.05;
+
+  const sideUp: "left" | "right" | "none" = leftUp && !rightUp ? "left" : rightUp && !leftUp ? "right" : "none";
+  const minRepMs = 300;
+
+  let repCount = prev.repCount;
+  let lastRepMs = prev.lastRepMs;
+  let lastSide = prev.lastSide;
+  let feedback = prev.feedback;
+
+  if (sideUp === "none") {
+    feedback = "Drive one knee up above hip height.";
+  } else {
+    feedback = `Knee up (${sideUp}). Keep alternating.`;
+  }
+
+  if (sideUp !== "none") {
+    const canCount = nowMs - lastRepMs > minRepMs;
+    const alternated = lastSide === "none" || lastSide !== sideUp;
+    if (canCount && alternated) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      lastSide = sideUp;
+    }
+  }
+
+  return {
+    ...prev,
+    repCount,
+    phase: sideUp === "none" ? "down" : "up",
+    lastPhaseChangeMs: prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget: true,
+    lastSide,
+    feedback,
   };
 }
 
 export default function PoseRepCounter() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const smoothedRef = useRef<NormalizedLandmark[] | null>(null);
 
   const [exercise, setExercise] = useState<ExerciseId>("jumping_jacks");
   const [status, setStatus] = useState<
@@ -259,6 +454,10 @@ export default function PoseRepCounter() {
     repCount: 0,
     phase: "unknown",
     lastPhaseChangeMs: 0,
+    lastRepMs: 0,
+    reachedTarget: false,
+    lastSide: "none",
+    feedback: "",
   }));
 
   const displayPhase = useMemo(() => {
@@ -276,6 +475,10 @@ export default function PoseRepCounter() {
       repCount: 0,
       phase: "unknown",
       lastPhaseChangeMs: 0,
+      lastRepMs: 0,
+      reachedTarget: false,
+      lastSide: "none",
+      feedback: "",
     }));
   }, [exercise]);
 
@@ -374,15 +577,17 @@ export default function PoseRepCounter() {
           ctx.scale(-1, 1);
 
           if (result.landmarks && result.landmarks[0]) {
-            const lms = result.landmarks[0];
+            const raw = result.landmarks[0];
+            const smoothed = smoothLandmarks(smoothedRef.current, raw, 0.25);
+            smoothedRef.current = smoothed;
 
-            drawingUtils.drawLandmarks(lms, {
+            drawingUtils.drawLandmarks(smoothed, {
               radius: (data) => 2 + 3 * clamp01(data.from?.z ? 0 : 1),
               color: "#3cf2b0",
             });
 
             drawingUtils.drawConnectors(
-              lms,
+              smoothed,
               PoseLandmarker.POSE_CONNECTIONS,
               {
                 color: "rgba(60, 242, 176, 0.35)",
@@ -397,17 +602,24 @@ export default function PoseRepCounter() {
                   repCount: 0,
                   phase: "unknown",
                   lastPhaseChangeMs: 0,
+                  lastRepMs: 0,
+                  reachedTarget: false,
+                  lastSide: "none",
+                  feedback: "",
                 };
               }
 
-              if (exercise === "jumping_jacks") return updateJumpingJackState(prev, lms, nowMs);
-              if (exercise === "squats") return updateSquatState(prev, lms, nowMs);
+              if (exercise === "jumping_jacks") return updateJumpingJackState(prev, smoothed, nowMs);
+              if (exercise === "squats") return updateSquatState(prev, smoothed, nowMs);
+              if (exercise === "lunges") return updateLungeState(prev, smoothed, nowMs);
+              if (exercise === "high_knees") return updateHighKneesState(prev, smoothed, nowMs);
               return prev;
             });
           } else {
             setRepState((prev) => ({
               ...prev,
               phase: "unknown",
+              feedback: "",
             }));
           }
 
@@ -467,8 +679,8 @@ export default function PoseRepCounter() {
     >
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
+          display: "grid",
+          gridTemplateColumns: "minmax(220px, 1fr) auto",
           gap: 12,
           alignItems: "center",
           justifyContent: "space-between",
@@ -478,64 +690,91 @@ export default function PoseRepCounter() {
           background: "rgba(255,255,255,0.03)",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ fontSize: 12, color: "#a7b4c7" }}>Exercise</div>
-          <select
-            value={exercise}
-            onChange={(e) => setExercise(e.target.value as ExerciseId)}
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Exercise</div>
+              <select
+                value={exercise}
+                onChange={(e) => setExercise(e.target.value as ExerciseId)}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              >
+                <option value="jumping_jacks">Jumping jacks</option>
+                <option value="squats">Squats</option>
+                <option value="lunges">Lunges</option>
+                <option value="high_knees">High knees</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setRepState((s) => ({
+                  ...s,
+                  repCount: 0,
+                  phase: "unknown",
+                  lastPhaseChangeMs: 0,
+                  lastRepMs: 0,
+                  reachedTarget: false,
+                  lastSide: "none",
+                  feedback: "",
+                }))
+              }
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                color: "#e6edf6",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 14,
+                cursor: "pointer",
+                alignSelf: "end",
+              }}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div
             style={{
-              background: "rgba(255,255,255,0.06)",
-              color: "#e6edf6",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12,
               padding: "10px 12px",
-              fontSize: 14,
-              outline: "none",
+              background: "rgba(0,0,0,0.18)",
+              color: repState.feedback ? "#d6ffe9" : "#a7b4c7",
+              fontSize: 13,
+              minHeight: 42,
+              display: "flex",
+              alignItems: "center",
             }}
           >
-            <option value="jumping_jacks">Jumping jacks</option>
-            <option value="squats">Squats</option>
-          </select>
+            {repState.feedback || "Move into frame to begin."}
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 12, color: "#a7b4c7" }}>Reps</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{repState.repCount}</div>
+        <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: 18 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Reps</div>
+              <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.2 }}>
+                {repState.repCount}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Phase</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{displayPhase}</div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 12, color: "#a7b4c7" }}>Phase</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{displayPhase}</div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 12, color: "#a7b4c7" }}>Status</div>
-            <div style={{ fontSize: 12 }}>{status}</div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              setRepState((s) => ({
-                ...s,
-                repCount: 0,
-                phase: "unknown",
-                lastPhaseChangeMs: 0,
-              }))
-            }
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              color: "#e6edf6",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontSize: 14,
-              cursor: "pointer",
-            }}
-          >
-            Reset
-          </button>
+          <div style={{ fontSize: 12, color: "#a7b4c7" }}>Status: {status}</div>
         </div>
       </div>
 
@@ -593,7 +832,7 @@ export default function PoseRepCounter() {
           padding: "0 4px",
         }}
       >
-        Tip: If reps don’t count, step back so your full body (ankles and wrists) is visible.
+        Tip: If reps don’t count, step back so your full body is visible and keep the camera stable.
       </div>
     </section>
   );
