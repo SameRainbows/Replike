@@ -589,8 +589,8 @@ export default function PoseRepCounter() {
   const [sessionRunning, setSessionRunning] = useState<boolean>(true);
   const [calibration, setCalibration] = useState<Calibration>({});
   const [events, setEvents] = useState<RepEvent[]>([]);
-  const [calibOpen, setCalibOpen] = useState(false);
-  const [calibStep, setCalibStep] = useState<0 | 1>(0);
+  const [manualCalibOpen, setManualCalibOpen] = useState(false);
+  const [manualCalibStep, setManualCalibStep] = useState<0 | 1>(0);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
 
@@ -681,6 +681,27 @@ export default function PoseRepCounter() {
       },
     ] as const;
   }, [exercise]);
+
+  const autoCalibHint = useMemo(() => {
+    const step = autoCalib.step;
+    const stepName = `Step ${step + 1}/2`;
+
+    if (exercise === "jumping_jacks") {
+      return step === 0
+        ? `${stepName}: Stand closed (feet together, arms down).`
+        : `${stepName}: Go open (feet wide, arms overhead).`;
+    }
+
+    if (exercise === "high_knees") {
+      return step === 0
+        ? `${stepName}: Stand at rest (both feet down).`
+        : `${stepName}: Hold a knee-up position.`;
+    }
+
+    return step === 0
+      ? `${stepName}: Stand tall (top position).`
+      : `${stepName}: Hold your deepest position (bottom).`;
+  }, [autoCalib.step, exercise]);
 
   useEffect(() => {
     const hasCalib = Boolean(calibration[exercise]);
@@ -1349,8 +1370,8 @@ export default function PoseRepCounter() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCalibStep(0);
-                    setCalibOpen(true);
+                    setManualCalibStep(0);
+                    setManualCalibOpen(true);
                   }}
                   style={{
                     background: "rgba(255,255,255,0.06)",
@@ -1362,7 +1383,7 @@ export default function PoseRepCounter() {
                     cursor: "pointer",
                   }}
                 >
-                  Calibrate
+                  Manual calibrate
                 </button>
                 <button
                   type="button"
@@ -1386,12 +1407,39 @@ export default function PoseRepCounter() {
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#a7b4c7" }}>
-              Recommended: calibrate once per exercise for the cleanest depth and fewer false counts.
-            </div>
+            {autoCalib.active ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, color: "#d6ffe9" }}>Auto-calibrating…</div>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>{autoCalibHint}</div>
+                <div
+                  style={{
+                    height: 8,
+                    borderRadius: 999,
+                    overflow: "hidden",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "rgba(0,0,0,0.18)",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.round((Math.min(900, autoCalib.stableMs) / 900) * 100)}%`,
+                      background: "rgba(60, 242, 176, 0.55)",
+                    }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                  Hold still for ~1 second. This runs automatically when calibration is missing.
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                Calibrated. Use Manual calibrate if you want to refine it.
+              </div>
+            )}
           </div>
 
-          {calibOpen && (
+          {manualCalibOpen && (
             <div
               role="dialog"
               aria-modal="true"
@@ -1404,7 +1452,7 @@ export default function PoseRepCounter() {
                 padding: 16,
                 zIndex: 50,
               }}
-              onClick={() => setCalibOpen(false)}
+              onClick={() => setManualCalibOpen(false)}
             >
               <div
                 className="card"
@@ -1418,14 +1466,14 @@ export default function PoseRepCounter() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
                   <div style={{ display: "grid", gap: 4 }}>
-                    <div style={{ fontSize: 12, color: "#a7b4c7" }}>Calibration</div>
+                    <div style={{ fontSize: 12, color: "#a7b4c7" }}>Manual calibration</div>
                     <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.2 }}>
                       {exercise.replace("_", " ")}
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCalibOpen(false)}
+                    onClick={() => setManualCalibOpen(false)}
                     style={{
                       background: "rgba(255,255,255,0.06)",
                       color: "#e6edf6",
@@ -1441,9 +1489,9 @@ export default function PoseRepCounter() {
                 </div>
 
                 <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 12 }}>
-                  <div style={{ fontWeight: 800 }}>{`Step ${calibStep + 1}/2: ${calibSteps[calibStep].title}`}</div>
+                  <div style={{ fontWeight: 800 }}>{`Step ${manualCalibStep + 1}/2: ${calibSteps[manualCalibStep].title}`}</div>
                   <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-                    {calibSteps[calibStep].hint}
+                    {calibSteps[manualCalibStep].hint}
                   </div>
                 </div>
 
@@ -1451,9 +1499,9 @@ export default function PoseRepCounter() {
                   <button
                     type="button"
                     onClick={() => {
-                      captureCalibrationFrame(calibStep);
-                      if (calibStep === 0) setCalibStep(1);
-                      else setCalibOpen(false);
+                      captureCalibrationFrame(manualCalibStep);
+                      if (manualCalibStep === 0) setManualCalibStep(1);
+                      else setManualCalibOpen(false);
                     }}
                     style={{
                       background: "rgba(60, 242, 176, 0.14)",
@@ -1466,12 +1514,12 @@ export default function PoseRepCounter() {
                       fontWeight: 800,
                     }}
                   >
-                    {calibSteps[calibStep].actionLabel}
+                    {calibSteps[manualCalibStep].actionLabel}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setCalibStep((s) => (s === 0 ? 1 : 0))}
+                    onClick={() => setManualCalibStep((s) => (s === 0 ? 1 : 0))}
                     style={{
                       background: "rgba(255,255,255,0.06)",
                       color: "#e6edf6",
@@ -1482,7 +1530,7 @@ export default function PoseRepCounter() {
                       cursor: "pointer",
                     }}
                   >
-                    {calibStep === 0 ? "Skip to step 2" : "Back to step 1"}
+                    {manualCalibStep === 0 ? "Skip to step 2" : "Back to step 1"}
                   </button>
                 </div>
 
@@ -1632,10 +1680,47 @@ export default function PoseRepCounter() {
           style={{
             position: "absolute",
             inset: 0,
-            width: "100%",
-            height: "100%",
+            pointerEvents: "none",
           }}
         />
+
+        {autoCalib.active && (
+          <div
+            style={{
+              position: "absolute",
+              left: 12,
+              top: 12,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(0,0,0,0.55)",
+              padding: "10px 12px",
+              color: "#e6edf6",
+              maxWidth: 340,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 13 }}>Auto-calibrating</div>
+            <div style={{ fontSize: 12, color: "#a7b4c7", lineHeight: 1.4 }}>{autoCalibHint}</div>
+            <div
+              style={{
+                height: 8,
+                borderRadius: 999,
+                overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.10)",
+                background: "rgba(0,0,0,0.18)",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.round((Math.min(900, autoCalib.stableMs) / 900) * 100)}%`,
+                  background: "rgba(60, 242, 176, 0.55)",
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div
