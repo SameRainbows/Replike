@@ -10,6 +10,14 @@ export default function WorkoutPage() {
         </p>
       </header>
 
+      <div className="card stack">
+        <div className="card__title">Setup</div>
+        <div className="muted">
+          Place your device so your full body fits in frame. If tracking feels off, pause and
+          reposition, then recalibrate.
+        </div>
+      </div>
+
       <PoseRepCounter />
     </section>
   );

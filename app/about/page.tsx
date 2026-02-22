@@ -8,6 +8,23 @@ export default function AboutPage() {
         </p>
       </header>
 
+      <div className="grid grid--2">
+        <div className="card stack">
+          <h2 className="h2">What it does</h2>
+          <p className="p">
+            You pick an exercise, calibrate your range-of-motion, and RepDetect counts clean
+            reps while showing live form cues.
+          </p>
+        </div>
+        <div className="card stack">
+          <h2 className="h2">What it doesn’t do</h2>
+          <p className="p">
+            It doesn’t record or upload your video. It’s a lightweight tool for practice and
+            consistency, not a medical or coaching device.
+          </p>
+        </div>
+      </div>
+
       <div className="card stack">
         <h2 className="h2">Tips for accuracy</h2>
         <div className="stack">
