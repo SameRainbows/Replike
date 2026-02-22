@@ -1097,11 +1097,6 @@ export default function PoseRepCounter() {
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw mirrored overlay to match mirrored video
-          ctx.save();
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-
           if (result.landmarks && result.landmarks[0]) {
             const raw = result.landmarks[0];
             const smoothed = smoothLandmarks(smoothedRef.current, raw, 0.25);
@@ -1199,8 +1194,6 @@ export default function PoseRepCounter() {
               feedback: "",
             }));
           }
-
-          ctx.restore();
         };
 
         render();
@@ -1681,6 +1674,7 @@ export default function PoseRepCounter() {
             position: "absolute",
             inset: 0,
             pointerEvents: "none",
+            transform: "scaleX(-1)",
           }}
         />
 
