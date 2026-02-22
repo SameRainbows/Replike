@@ -591,6 +591,16 @@ export default function PoseRepCounter() {
   const [events, setEvents] = useState<RepEvent[]>([]);
   const [calibOpen, setCalibOpen] = useState(false);
   const [calibStep, setCalibStep] = useState<0 | 1>(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  const [autoCalib, setAutoCalib] = useState<{
+    active: boolean;
+    step: 0 | 1;
+    stableMs: number;
+    lastOkMs: number;
+    lastCaptureMs: number;
+  }>(() => ({ active: false, step: 0, stableMs: 0, lastOkMs: 0, lastCaptureMs: 0 }));
   const [status, setStatus] = useState<
     "idle" | "loading_model" | "requesting_camera" | "running" | "error"
   >("idle");
@@ -617,6 +627,15 @@ export default function PoseRepCounter() {
     if (repState.phase === "up") return "Up";
     return "Down";
   }, [repState.phase]);
+
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, 1400);
+  }
 
   const calibSteps = useMemo(() => {
     if (exercise === "jumping_jacks") {
@@ -662,6 +681,18 @@ export default function PoseRepCounter() {
       },
     ] as const;
   }, [exercise]);
+
+  useEffect(() => {
+    const hasCalib = Boolean(calibration[exercise]);
+    setAutoCalib((s) => ({
+      ...s,
+      active: !hasCalib,
+      step: 0,
+      stableMs: 0,
+      lastOkMs: 0,
+      lastCaptureMs: 0,
+    }));
+  }, [exercise, calibration]);
 
   function captureCalibrationFrame(step: 0 | 1) {
     const lms = lastLandmarksRef.current;
@@ -850,19 +881,111 @@ export default function PoseRepCounter() {
     if (repState.decisionKind === "none") return;
     if (!repState.decisionMessage) return;
 
+    const kind = repState.decisionKind === "rep" ? "rep" : "reject";
+
+    if (kind === "rep") {
+      // Avoid filling the screen with "Rep counted" lines. Use a toast for most reps.
+      showToast(`+1 ${exercise.replace("_", " ")}`);
+      const milestone = repState.repCount === 1 || repState.repCount % 5 === 0;
+      if (!milestone) return;
+    }
+
     setEvents((prev) => {
       const next: RepEvent = {
         id: newId(),
         ts: Date.now(),
         exercise,
-        kind: repState.decisionKind === "rep" ? "rep" : "reject",
-        message: repState.decisionMessage,
+        kind,
+        message: kind === "rep" ? `Milestone: ${repState.repCount}` : repState.decisionMessage,
         reps: repState.repCount,
       };
       const merged = [next, ...prev];
-      return merged.slice(0, 12);
+      return merged.slice(0, 20);
     });
   }, [repState.decisionId]);
+
+  function isPoseStableForAutoCalibration(
+    landmarks: NormalizedLandmark[],
+    step: 0 | 1
+  ): boolean {
+    if (exercise === "jumping_jacks") {
+      const lShoulder = getLandmark(landmarks, 11);
+      const rShoulder = getLandmark(landmarks, 12);
+      const lWrist = getLandmark(landmarks, 15);
+      const rWrist = getLandmark(landmarks, 16);
+      const lAnkle = getLandmark(landmarks, 27);
+      const rAnkle = getLandmark(landmarks, 28);
+      const nose = getLandmark(landmarks, 0);
+      if (
+        !isLandmarkConfident(lShoulder, 0.35) ||
+        !isLandmarkConfident(rShoulder, 0.35) ||
+        !isLandmarkConfident(lWrist, 0.35) ||
+        !isLandmarkConfident(rWrist, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35) ||
+        !isLandmarkConfident(nose, 0.35)
+      )
+        return false;
+
+      const shoulderWidth = dist(lShoulder!, rShoulder!);
+      const ankleWidth = dist(lAnkle!, rAnkle!);
+      const ratio = ankleWidth / Math.max(shoulderWidth, 1e-6);
+      const headY = nose!.y;
+      const wristsY = avg(lWrist!.y, rWrist!.y);
+      const armsLift = headY - wristsY;
+
+      const isClosed = ratio < 1.25 && armsLift < 0.04;
+      const isOpen = ratio > 1.4 && armsLift > 0.06;
+      return step === 0 ? isClosed : isOpen;
+    }
+
+    if (exercise === "squats" || exercise === "lunges") {
+      const lHip = getLandmark(landmarks, 23);
+      const rHip = getLandmark(landmarks, 24);
+      const lKnee = getLandmark(landmarks, 25);
+      const rKnee = getLandmark(landmarks, 26);
+      const lAnkle = getLandmark(landmarks, 27);
+      const rAnkle = getLandmark(landmarks, 28);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35)
+      )
+        return false;
+
+      const lAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+      const rAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+      const angle = Math.min(lAngle, rAngle);
+      const isTop = angle > 165;
+      const isBottom = angle < 130;
+      return step === 0 ? isTop : isBottom;
+    }
+
+    if (exercise === "high_knees") {
+      const lHip = getLandmark(landmarks, 23);
+      const rHip = getLandmark(landmarks, 24);
+      const lKnee = getLandmark(landmarks, 25);
+      const rKnee = getLandmark(landmarks, 26);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35)
+      )
+        return false;
+
+      const hipY = avg(lHip!.y, rHip!.y);
+      const lift = Math.max(hipY - lKnee!.y, hipY - rKnee!.y);
+      const isRest = lift < 0.04;
+      const isUp = lift > 0.09;
+      return step === 0 ? isRest : isUp;
+    }
+
+    return false;
+  }
 
   useEffect(() => {
     let landmarker: PoseLandmarker | null = null;
@@ -963,6 +1086,40 @@ export default function PoseRepCounter() {
             const smoothed = smoothLandmarks(smoothedRef.current, raw, 0.25);
             smoothedRef.current = smoothed;
             lastLandmarksRef.current = smoothed;
+
+            // Hands-free calibration: when missing calibration, wait for stable poses and capture automatically.
+            if (autoCalib.active) {
+              const ok = isPoseStableForAutoCalibration(smoothed, autoCalib.step);
+              const stableNeededMs = 900;
+              const now = nowMs;
+
+              setAutoCalib((s) => {
+                if (!s.active) return s;
+                const okNow = isPoseStableForAutoCalibration(smoothed, s.step);
+                const lastOkMs = okNow ? (s.lastOkMs || now) : 0;
+                const stableMs = okNow ? now - lastOkMs : 0;
+                const cooldownOk = now - s.lastCaptureMs > 700;
+
+                if (okNow && stableMs >= stableNeededMs && cooldownOk) {
+                  captureCalibrationFrame(s.step);
+                  showToast(s.step === 0 ? "Calibrated step 1/2" : "Calibration complete");
+                  return {
+                    ...s,
+                    step: s.step === 0 ? 1 : 0,
+                    active: s.step === 0,
+                    stableMs: 0,
+                    lastOkMs: 0,
+                    lastCaptureMs: now,
+                  };
+                }
+
+                return {
+                  ...s,
+                  stableMs,
+                  lastOkMs,
+                };
+              });
+            }
 
             drawingUtils.drawLandmarks(smoothed, {
               radius: (data) => 2 + 3 * clamp01(data.from?.z ? 0 : 1),
@@ -1346,8 +1503,26 @@ export default function PoseRepCounter() {
               gap: 10,
             }}
           >
-            <div style={{ fontSize: 12, color: "#a7b4c7" }}>Rep log</div>
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Rep log</div>
+              <button
+                type="button"
+                onClick={() => setEvents([])}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 10,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Clear log
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 8, maxHeight: 170, overflow: "auto" }}>
               {events.length === 0 ? (
                 <div style={{ fontSize: 12, color: "#a7b4c7" }}>No events yet.</div>
               ) : (
@@ -1367,7 +1542,7 @@ export default function PoseRepCounter() {
                     }}
                   >
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {ev.kind === "rep" ? `+1 rep (${ev.reps})` : "Rejected"}: {ev.message}
+                      {ev.kind === "rep" ? `Rep ${ev.reps}` : "Rejected"}: {ev.message}
                     </div>
                     <div style={{ color: "#a7b4c7", flex: "0 0 auto" }}>
                       {new Date(ev.ts).toLocaleTimeString()}
@@ -1378,6 +1553,26 @@ export default function PoseRepCounter() {
             </div>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              position: "fixed",
+              right: 16,
+              bottom: 16,
+              zIndex: 60,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(0,0,0,0.7)",
+              color: "#e6edf6",
+              padding: "10px 12px",
+              fontSize: 13,
+              maxWidth: 280,
+            }}
+          >
+            {toast}
+          </div>
+        )}
 
         <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
           <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: 18 }}>
