@@ -12,7 +12,9 @@ type ExerciseId =
   | "jumping_jacks"
   | "squats"
   | "lunges"
-  | "high_knees";
+  | "high_knees"
+  | "jump_squats"
+  | "burpees";
 
 type DecisionKind = "none" | "rep" | "reject";
 
@@ -61,11 +63,36 @@ type HighKneesCalibration = {
   downLift: number;
 };
 
+type JumpSquatCalibration = {
+  topKneeAngle: number;
+  bottomKneeAngle: number;
+};
+
 type Calibration = {
   jumping_jacks?: JumpingJackCalibration;
   squats?: SquatCalibration;
   lunges?: LungeCalibration;
   high_knees?: HighKneesCalibration;
+  jump_squats?: JumpSquatCalibration;
+};
+
+type WorkoutStep =
+  | {
+      kind: "work_reps";
+      exercise: ExerciseId;
+      targetReps: number;
+      label: string;
+    }
+  | {
+      kind: "rest";
+      restSec: number;
+      label: string;
+    };
+
+type WorkoutPlan = {
+  id: string;
+  name: string;
+  steps: WorkoutStep[];
 };
 
 function formatUnknownError(e: unknown) {
@@ -290,6 +317,186 @@ function updateJumpingJackState(
       decisionId += 1;
       decisionKind = "reject";
       decisionMessage = reachedTarget ? "Too fast. Slow down." : "Didn’t reach full open position.";
+    }
+  }
+
+  return {
+    ...prev,
+    repCount,
+    phase: nextPhase,
+    lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
+  };
+}
+
+function updateJumpSquatState(
+  prev: RepState,
+  landmarks: NormalizedLandmark[],
+  nowMs: number,
+  calib?: JumpSquatCalibration
+): RepState {
+  const lHip = getLandmark(landmarks, 23);
+  const rHip = getLandmark(landmarks, 24);
+  const lKnee = getLandmark(landmarks, 25);
+  const rKnee = getLandmark(landmarks, 26);
+  const lAnkle = getLandmark(landmarks, 27);
+  const rAnkle = getLandmark(landmarks, 28);
+
+  const minVisible =
+    isLandmarkConfident(lHip, 0.4) &&
+    isLandmarkConfident(rHip, 0.4) &&
+    isLandmarkConfident(lKnee, 0.4) &&
+    isLandmarkConfident(rKnee, 0.4) &&
+    isLandmarkConfident(lAnkle, 0.4) &&
+    isLandmarkConfident(rAnkle, 0.4);
+
+  if (!minVisible) return { ...prev, phase: "unknown" };
+
+  const lKneeAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+  const rKneeAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+  const kneeAngle = Math.min(lKneeAngle, rKneeAngle);
+
+  const top = calib ? calib.topKneeAngle : 175;
+  const bottom = calib ? calib.bottomKneeAngle : 110;
+  const downEnter = calib ? bottom + 12 : 118;
+  const downExit = calib ? bottom + 28 : 140;
+  const upEnter = calib ? top - 10 : 165;
+  const upExit = calib ? top - 20 : 155;
+  const minRepMs = 520;
+
+  const isDown = prev.phase === "down" ? kneeAngle < downExit : kneeAngle < downEnter;
+  const isUp = prev.phase === "up" ? kneeAngle > upExit : kneeAngle > upEnter;
+
+  const minPhaseMs = 200;
+  const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
+
+  let nextPhase = prev.phase;
+  if (prev.phase === "unknown") nextPhase = isDown ? "down" : "up";
+  else if (canSwitch) {
+    if (prev.phase === "up" && isDown) nextPhase = "down";
+    if (prev.phase === "down" && isUp) nextPhase = "up";
+  }
+
+  let repCount = prev.repCount;
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let feedback = prev.feedback;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
+
+  if (nextPhase === "down") reachedTarget = true;
+
+  const depthPct = clamp01((top - kneeAngle) / Math.max(top - bottom, 1e-6));
+  if (kneeAngle < downEnter) feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (explode up).`;
+  else if (depthPct > 0.45) feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (go lower).`;
+  else feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (start).`;
+
+  if (prev.phase === "down" && nextPhase === "up") {
+    if (reachedTarget && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+      decisionId += 1;
+      decisionKind = "rep";
+      decisionMessage = "Rep counted.";
+    } else {
+      decisionId += 1;
+      decisionKind = "reject";
+      decisionMessage = reachedTarget ? "Too fast. Control the landing." : "Not deep enough.";
+    }
+  }
+
+  return {
+    ...prev,
+    repCount,
+    phase: nextPhase,
+    lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
+    lastRepMs,
+    reachedTarget,
+    feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
+  };
+}
+
+function updateBurpeeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+  const lShoulder = getLandmark(landmarks, 11);
+  const rShoulder = getLandmark(landmarks, 12);
+  const lHip = getLandmark(landmarks, 23);
+  const rHip = getLandmark(landmarks, 24);
+  const lKnee = getLandmark(landmarks, 25);
+  const rKnee = getLandmark(landmarks, 26);
+  const lAnkle = getLandmark(landmarks, 27);
+  const rAnkle = getLandmark(landmarks, 28);
+
+  const minVisible =
+    isLandmarkConfident(lShoulder, 0.35) &&
+    isLandmarkConfident(rShoulder, 0.35) &&
+    isLandmarkConfident(lHip, 0.35) &&
+    isLandmarkConfident(rHip, 0.35) &&
+    isLandmarkConfident(lKnee, 0.35) &&
+    isLandmarkConfident(rKnee, 0.35) &&
+    isLandmarkConfident(lAnkle, 0.35) &&
+    isLandmarkConfident(rAnkle, 0.35);
+
+  if (!minVisible) return { ...prev, phase: "unknown", feedback: "Keep your full body in frame." };
+
+  const shoulderY = avg(lShoulder!.y, rShoulder!.y);
+  const hipY = avg(lHip!.y, rHip!.y);
+
+  const lKneeAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+  const rKneeAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+  const kneeAngle = Math.min(lKneeAngle, rKneeAngle);
+
+  const standLike = kneeAngle > 165 && hipY < 0.58;
+  const crouchLike = kneeAngle < 145 || hipY > 0.62;
+  const plankLike = shoulderY > 0.52 && hipY > 0.56 && Math.abs(hipY - shoulderY) < 0.16;
+
+  const minPhaseMs = 220;
+  const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
+  const minRepMs = 950;
+
+  let nextPhase = prev.phase;
+  if (prev.phase === "unknown") nextPhase = standLike ? "up" : plankLike ? "open" : "down";
+  else if (canSwitch) {
+    if (plankLike) nextPhase = "open";
+    else if (crouchLike) nextPhase = "down";
+    else if (standLike) nextPhase = "up";
+  }
+
+  let repCount = prev.repCount;
+  let reachedTarget = prev.reachedTarget;
+  let lastRepMs = prev.lastRepMs;
+  let feedback = prev.feedback;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
+
+  if (nextPhase === "open") reachedTarget = true;
+
+  if (nextPhase === "up") feedback = "Stand tall, then drop down.";
+  else if (nextPhase === "down") feedback = "Hands down, kick back to plank.";
+  else if (nextPhase === "open") feedback = "Plank. Drive feet in, then stand.";
+
+  if (prev.phase === "open" && nextPhase === "up") {
+    if (reachedTarget && nowMs - lastRepMs > minRepMs) {
+      repCount += 1;
+      lastRepMs = nowMs;
+      reachedTarget = false;
+      decisionId += 1;
+      decisionKind = "rep";
+      decisionMessage = "Rep counted.";
+    } else {
+      decisionId += 1;
+      decisionKind = "reject";
+      decisionMessage = reachedTarget ? "Too fast. Control the rep." : "Hit a solid plank position.";
     }
   }
 
@@ -594,6 +801,10 @@ export default function PoseRepCounter() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
 
+  const exerciseRef = useRef<ExerciseId>(exercise);
+  const sessionRunningRef = useRef<boolean>(sessionRunning);
+  const calibrationRef = useRef<Calibration>(calibration);
+
   const [autoCalib, setAutoCalib] = useState<{
     active: boolean;
     step: 0 | 1;
@@ -627,6 +838,49 @@ export default function PoseRepCounter() {
     if (repState.phase === "up") return "Up";
     return "Down";
   }, [repState.phase]);
+
+  const workoutPlans = useMemo<WorkoutPlan[]>(() => {
+    const plans: WorkoutPlan[] = [
+      {
+        id: "starter_cardio",
+        name: "Starter cardio (8 min)",
+        steps: [
+          { kind: "work_reps", exercise: "jumping_jacks", targetReps: 30, label: "Jumping jacks" },
+          { kind: "rest", restSec: 30, label: "Rest" },
+          { kind: "work_reps", exercise: "high_knees", targetReps: 40, label: "High knees" },
+          { kind: "rest", restSec: 40, label: "Rest" },
+          { kind: "work_reps", exercise: "jump_squats", targetReps: 15, label: "Jump squats" },
+          { kind: "rest", restSec: 45, label: "Rest" },
+          { kind: "work_reps", exercise: "burpees", targetReps: 10, label: "Burpees" },
+        ],
+      },
+      {
+        id: "legs_builder",
+        name: "Legs builder (10 min)",
+        steps: [
+          { kind: "work_reps", exercise: "squats", targetReps: 20, label: "Squats" },
+          { kind: "rest", restSec: 45, label: "Rest" },
+          { kind: "work_reps", exercise: "lunges", targetReps: 16, label: "Lunges" },
+          { kind: "rest", restSec: 45, label: "Rest" },
+          { kind: "work_reps", exercise: "jump_squats", targetReps: 12, label: "Jump squats" },
+          { kind: "rest", restSec: 60, label: "Rest" },
+          { kind: "work_reps", exercise: "high_knees", targetReps: 50, label: "High knees" },
+        ],
+      },
+    ];
+    return plans;
+  }, []);
+
+  const [planMode, setPlanMode] = useState<"free" | "plan">("free");
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("starter_cardio");
+  const [planState, setPlanState] = useState<{
+    active: boolean;
+    planId: string;
+    stepIndex: number;
+    stepStartedAt: number;
+    stepStartReps: number;
+  }>(() => ({ active: false, planId: "starter_cardio", stepIndex: 0, stepStartedAt: 0, stepStartReps: 0 }));
+  const [planNowMs, setPlanNowMs] = useState<number>(0);
 
   function showToast(message: string) {
     setToast(message);
@@ -704,7 +958,7 @@ export default function PoseRepCounter() {
   }, [autoCalib.step, exercise]);
 
   useEffect(() => {
-    const hasCalib = Boolean(calibration[exercise]);
+    const hasCalib = exercise === "burpees" ? true : Boolean(calibration[exercise]);
     setAutoCalib((s) => ({
       ...s,
       active: !hasCalib,
@@ -848,6 +1102,38 @@ export default function PoseRepCounter() {
 
       return;
     }
+
+    if (exercise === "jump_squats") {
+      const lHip = getLandmark(lms, 23);
+      const rHip = getLandmark(lms, 24);
+      const lKnee = getLandmark(lms, 25);
+      const rKnee = getLandmark(lms, 26);
+      const lAnkle = getLandmark(lms, 27);
+      const rAnkle = getLandmark(lms, 28);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35)
+      )
+        return;
+
+      const lAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+      const rAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+      const angle = Math.min(lAngle, rAngle);
+
+      setCalibration((c) => ({
+        ...c,
+        jump_squats: {
+          topKneeAngle: step === 0 ? angle : c.jump_squats?.topKneeAngle ?? 175,
+          bottomKneeAngle: step === 1 ? angle : c.jump_squats?.bottomKneeAngle ?? 110,
+        },
+      }));
+
+      return;
+    }
   }
 
   useEffect(() => {
@@ -857,10 +1143,14 @@ export default function PoseRepCounter() {
       const parsed = JSON.parse(raw) as {
         exercise?: ExerciseId;
         calibration?: Calibration;
+        planMode?: "free" | "plan";
+        selectedPlanId?: string;
       };
 
       if (parsed.exercise) setExercise(parsed.exercise);
       if (parsed.calibration) setCalibration(parsed.calibration);
+      if (parsed.planMode) setPlanMode(parsed.planMode);
+      if (parsed.selectedPlanId) setSelectedPlanId(parsed.selectedPlanId);
     } catch {
       // ignore
     }
@@ -873,12 +1163,26 @@ export default function PoseRepCounter() {
         JSON.stringify({
           exercise,
           calibration,
+          planMode,
+          selectedPlanId,
         })
       );
     } catch {
       // ignore
     }
-  }, [exercise, calibration]);
+  }, [exercise, calibration, planMode, selectedPlanId]);
+
+  useEffect(() => {
+    exerciseRef.current = exercise;
+  }, [exercise]);
+
+  useEffect(() => {
+    sessionRunningRef.current = sessionRunning;
+  }, [sessionRunning]);
+
+  useEffect(() => {
+    calibrationRef.current = calibration;
+  }, [calibration]);
 
   useEffect(() => {
     setRepState((s) => ({
@@ -924,6 +1228,64 @@ export default function PoseRepCounter() {
       return merged.slice(0, 20);
     });
   }, [repState.decisionId]);
+
+  const activePlan = useMemo(() => workoutPlans.find((p) => p.id === selectedPlanId) ?? workoutPlans[0], [selectedPlanId, workoutPlans]);
+  const activePlanStep = useMemo(() => {
+    if (!planState.active) return null;
+    const plan = workoutPlans.find((p) => p.id === planState.planId);
+    if (!plan) return null;
+    return plan.steps[planState.stepIndex] ?? null;
+  }, [planState, workoutPlans]);
+
+  useEffect(() => {
+    if (!planState.active) return;
+    setPlanNowMs(Date.now());
+    const id = window.setInterval(() => setPlanNowMs(Date.now()), 200);
+    return () => window.clearInterval(id);
+  }, [planState.active]);
+
+  useEffect(() => {
+    if (!planState.active) return;
+    if (!activePlanStep) return;
+
+    if (activePlanStep.kind === "work_reps") {
+      if (exercise !== activePlanStep.exercise) setExercise(activePlanStep.exercise);
+
+      const repsDone = repState.repCount - planState.stepStartReps;
+      if (repsDone >= activePlanStep.targetReps) {
+        const nextIndex = planState.stepIndex + 1;
+        if (nextIndex >= activePlan.steps.length) {
+          showToast("Workout complete");
+          setPlanState((s) => ({ ...s, active: false }));
+          return;
+        }
+        setPlanState((s) => ({
+          ...s,
+          stepIndex: nextIndex,
+          stepStartedAt: Date.now(),
+          stepStartReps: repState.repCount,
+        }));
+      }
+    }
+
+    if (activePlanStep.kind === "rest") {
+      const elapsedSec = (planNowMs - planState.stepStartedAt) / 1000;
+      if (elapsedSec >= activePlanStep.restSec) {
+        const nextIndex = planState.stepIndex + 1;
+        if (nextIndex >= activePlan.steps.length) {
+          showToast("Workout complete");
+          setPlanState((s) => ({ ...s, active: false }));
+          return;
+        }
+        setPlanState((s) => ({
+          ...s,
+          stepIndex: nextIndex,
+          stepStartedAt: Date.now(),
+          stepStartReps: repState.repCount,
+        }));
+      }
+    }
+  }, [planState.active, planState.stepIndex, planState.stepStartReps, planState.stepStartedAt, planNowMs, repState.repCount, activePlanStep, activePlan, exercise]);
 
   function isPoseStableForAutoCalibration(
     landmarks: NormalizedLandmark[],
@@ -1155,9 +1517,13 @@ export default function PoseRepCounter() {
             );
 
             setRepState((prev) => {
-              if (prev.exercise !== exercise) {
+              const ex = exerciseRef.current;
+              const running = sessionRunningRef.current;
+              const calib = calibrationRef.current;
+
+              if (prev.exercise !== ex) {
                 return {
-                  exercise,
+                  exercise: ex,
                   repCount: 0,
                   phase: "unknown",
                   lastPhaseChangeMs: 0,
@@ -1171,7 +1537,7 @@ export default function PoseRepCounter() {
                 };
               }
 
-              if (!sessionRunning) {
+              if (!running) {
                 return {
                   ...prev,
                   feedback: "Paused.",
@@ -1180,14 +1546,12 @@ export default function PoseRepCounter() {
                 };
               }
 
-              if (exercise === "jumping_jacks")
-                return updateJumpingJackState(prev, smoothed, nowMs, calibration.jumping_jacks);
-              if (exercise === "squats")
-                return updateSquatState(prev, smoothed, nowMs, calibration.squats);
-              if (exercise === "lunges")
-                return updateLungeState(prev, smoothed, nowMs, calibration.lunges);
-              if (exercise === "high_knees")
-                return updateHighKneesState(prev, smoothed, nowMs, calibration.high_knees);
+              if (ex === "jumping_jacks") return updateJumpingJackState(prev, smoothed, nowMs, calib.jumping_jacks);
+              if (ex === "squats") return updateSquatState(prev, smoothed, nowMs, calib.squats);
+              if (ex === "lunges") return updateLungeState(prev, smoothed, nowMs, calib.lunges);
+              if (ex === "high_knees") return updateHighKneesState(prev, smoothed, nowMs, calib.high_knees);
+              if (ex === "jump_squats") return updateJumpSquatState(prev, smoothed, nowMs, calib.jump_squats);
+              if (ex === "burpees") return updateBurpeeState(prev, smoothed, nowMs);
               return prev;
             });
           } else {
@@ -1240,7 +1604,7 @@ export default function PoseRepCounter() {
         landmarker.close();
       }
     };
-  }, [exercise]);
+  }, []);
 
   return (
     <section
@@ -1270,6 +1634,7 @@ export default function PoseRepCounter() {
               <select
                 value={exercise}
                 onChange={(e) => setExercise(e.target.value as ExerciseId)}
+                disabled={planState.active}
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   color: "#e6edf6",
@@ -1278,14 +1643,70 @@ export default function PoseRepCounter() {
                   padding: "10px 12px",
                   fontSize: 14,
                   outline: "none",
+                  opacity: planState.active ? 0.7 : 1,
                 }}
               >
                 <option value="jumping_jacks">Jumping jacks</option>
                 <option value="squats">Squats</option>
                 <option value="lunges">Lunges</option>
                 <option value="high_knees">High knees</option>
+                <option value="jump_squats">Jump squats</option>
+                <option value="burpees">Burpees</option>
               </select>
             </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Mode</div>
+              <select
+                value={planMode}
+                onChange={(e) => {
+                  const v = e.target.value as "free" | "plan";
+                  setPlanMode(v);
+                  if (v === "free") setPlanState((s) => ({ ...s, active: false }));
+                }}
+                disabled={planState.active}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                  opacity: planState.active ? 0.7 : 1,
+                }}
+              >
+                <option value="free">Free workout</option>
+                <option value="plan">Guided plan</option>
+              </select>
+            </div>
+
+            {planMode === "plan" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 260 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Plan</div>
+                <select
+                  value={selectedPlanId}
+                  onChange={(e) => setSelectedPlanId(e.target.value)}
+                  disabled={planState.active}
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e6edf6",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    outline: "none",
+                    opacity: planState.active ? 0.7 : 1,
+                  }}
+                >
+                  {workoutPlans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <button
               type="button"
@@ -1303,6 +1724,43 @@ export default function PoseRepCounter() {
             >
               {sessionRunning ? "Pause" : "Resume"}
             </button>
+
+            {planMode === "plan" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (planState.active) {
+                    setPlanState((s) => ({ ...s, active: false }));
+                    showToast("Plan stopped");
+                    return;
+                  }
+
+                  setPlanState({
+                    active: true,
+                    planId: selectedPlanId,
+                    stepIndex: 0,
+                    stepStartedAt: Date.now(),
+                    stepStartReps: repState.repCount,
+                  });
+                  showToast("Plan started");
+                }}
+                style={{
+                  background: planState.active ? "rgba(255, 80, 80, 0.12)" : "rgba(60, 242, 176, 0.14)",
+                  color: "#e6edf6",
+                  border: planState.active
+                    ? "1px solid rgba(255, 80, 80, 0.28)"
+                    : "1px solid rgba(60, 242, 176, 0.35)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  alignSelf: "end",
+                  fontWeight: 800,
+                }}
+              >
+                {planState.active ? "Stop plan" : "Start plan"}
+              </button>
+            )}
 
             <button
               type="button"
@@ -1349,6 +1807,44 @@ export default function PoseRepCounter() {
             {repState.feedback || "Move into frame to begin."}
           </div>
 
+          {planState.active && activePlanStep && (
+            <div
+              style={{
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                padding: 12,
+                background: "rgba(255,255,255,0.02)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Guided plan</div>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>{`${planState.stepIndex + 1}/${activePlan.steps.length}`}</div>
+              </div>
+              {activePlanStep.kind === "work_reps" ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{`${activePlanStep.label}: ${activePlanStep.targetReps} reps`}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Progress: ${Math.max(0, repState.repCount - planState.stepStartReps)}/${activePlanStep.targetReps}`}
+                  </div>
+                  {activePlanStep.exercise === "burpees" && (
+                    <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                      Burpees track best with a stable camera and full body visible.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{activePlanStep.label}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Time left: ${Math.max(0, Math.ceil(activePlanStep.restSec - (planNowMs - planState.stepStartedAt) / 1000))}s`}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div
             style={{
               display: "grid",
@@ -1369,6 +1865,7 @@ export default function PoseRepCounter() {
                     setManualCalibStep(0);
                     setManualCalibOpen(true);
                   }}
+                  disabled={exercise === "burpees"}
                   style={{
                     background: "rgba(255,255,255,0.06)",
                     color: "#e6edf6",
@@ -1377,6 +1874,7 @@ export default function PoseRepCounter() {
                     padding: "8px 10px",
                     fontSize: 13,
                     cursor: "pointer",
+                    opacity: exercise === "burpees" ? 0.6 : 1,
                   }}
                 >
                   Manual calibrate
@@ -1389,6 +1887,7 @@ export default function PoseRepCounter() {
                       [exercise]: undefined,
                     }))
                   }
+                  disabled={exercise === "burpees"}
                   style={{
                     background: "rgba(255,255,255,0.06)",
                     color: "#e6edf6",
@@ -1397,13 +1896,16 @@ export default function PoseRepCounter() {
                     padding: "8px 10px",
                     fontSize: 13,
                     cursor: "pointer",
+                    opacity: exercise === "burpees" ? 0.6 : 1,
                   }}
                 >
                   Clear
                 </button>
               </div>
             </div>
-            {autoCalib.active ? (
+            {exercise === "burpees" ? (
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Burpees don’t require calibration.</div>
+            ) : autoCalib.active ? (
               <div style={{ display: "grid", gap: 8 }}>
                 <div style={{ fontSize: 12, color: "#d6ffe9" }}>Auto-calibrating…</div>
                 <div style={{ fontSize: 12, color: "#a7b4c7" }}>{autoCalibHint}</div>
