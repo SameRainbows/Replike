@@ -1078,9 +1078,12 @@ export default function PoseRepCounter() {
           const videoEl = videoRef.current;
           if (videoEl.readyState < 2) return;
 
-          // Resize canvas to match the displayed video size
-          const w = videoEl.videoWidth;
-          const h = videoEl.videoHeight;
+          // Resize canvas to match the *rendered* video size.
+          // Using intrinsic videoWidth/videoHeight can desync the overlay when the video is
+          // displayed responsively (width: 100%, height: auto), causing visible offsets.
+          const rect = videoEl.getBoundingClientRect();
+          const w = Math.round(rect.width);
+          const h = Math.round(rect.height);
           if (!w || !h) return;
 
           if (canvas.width !== w || canvas.height !== h) {
