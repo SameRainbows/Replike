@@ -12,9 +12,7 @@ type ExerciseId =
   | "jumping_jacks"
   | "squats"
   | "lunges"
-  | "high_knees"
-  | "pull_ups"
-  | "chin_ups";
+  | "high_knees";
 
 type RepState = {
   exercise: ExerciseId;
@@ -26,19 +24,6 @@ type RepState = {
   lastSide: "left" | "right" | "none";
   feedback: string;
 };
-
-type BarLine = {
-  // Normalized (0..1) screen-space coordinates relative to the video.
-  // We treat the bar as horizontal and use y as the main signal.
-  y: number;
-  x1: number;
-  x2: number;
-};
-
-type BarAutoState =
-  | { status: "idle" }
-  | { status: "sampling"; samples: number; startedMs: number }
-  | { status: "done" };
 
 function formatUnknownError(e: unknown) {
   if (e instanceof Error) {
@@ -75,18 +60,6 @@ function formatUnknownError(e: unknown) {
   } catch {
     return String(e);
   }
-}
-
-function clamp(x: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, x));
-}
-
-function median(values: number[]) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid]!;
-  return (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 function clamp01(x: number) {
@@ -469,122 +442,11 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
   };
 }
 
-function updateBarExerciseState(
-  prev: RepState,
-  landmarks: NormalizedLandmark[],
-  nowMs: number,
-  bar: BarLine | null,
-  label: "Pull-ups" | "Chin-ups"
-): RepState {
-  if (!bar) {
-    return {
-      ...prev,
-      phase: "unknown",
-      feedback: `Set the bar line to start counting ${label.toLowerCase()}.`,
-    };
-  }
-
-  const mouthL = getLandmark(landmarks, 9);
-  const mouthR = getLandmark(landmarks, 10);
-  const lWrist = getLandmark(landmarks, 15);
-  const rWrist = getLandmark(landmarks, 16);
-  const lShoulder = getLandmark(landmarks, 11);
-  const rShoulder = getLandmark(landmarks, 12);
-  const lElbow = getLandmark(landmarks, 13);
-  const rElbow = getLandmark(landmarks, 14);
-
-  const minVisible =
-    isLandmarkConfident(mouthL, 0.35) &&
-    isLandmarkConfident(mouthR, 0.35) &&
-    isLandmarkConfident(lWrist, 0.35) &&
-    isLandmarkConfident(rWrist, 0.35) &&
-    isLandmarkConfident(lShoulder, 0.35) &&
-    isLandmarkConfident(rShoulder, 0.35) &&
-    isLandmarkConfident(lElbow, 0.35) &&
-    isLandmarkConfident(rElbow, 0.35);
-
-  if (!minVisible) {
-    return {
-      ...prev,
-      phase: "unknown",
-      feedback: "Make sure your face and arms are visible.",
-    };
-  }
-
-  const mouthY = avg(mouthL!.y, mouthR!.y);
-  const wristsY = avg(lWrist!.y, rWrist!.y);
-  const wristNearBar = Math.abs(wristsY - bar.y) < 0.12;
-
-  const lElbowAngle = angleDeg(lShoulder!, lElbow!, lWrist!);
-  const rElbowAngle = angleDeg(rShoulder!, rElbow!, rWrist!);
-  const elbowAngle = Math.min(lElbowAngle, rElbowAngle);
-
-  const topEnter = 0.015;
-  const topExit = 0.005;
-  const chinAboveBar = prev.phase === "up" ? mouthY < bar.y - topExit : mouthY < bar.y - topEnter;
-
-  const bottomEnter = 165;
-  const bottomExit = 155;
-  const elbowsExtended = prev.phase === "down" ? elbowAngle > bottomExit : elbowAngle > bottomEnter;
-
-  const minRepMs = 900;
-  const minPhaseMs = 200;
-  const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
-
-  let nextPhase = prev.phase;
-  if (prev.phase === "unknown") {
-    nextPhase = chinAboveBar ? "up" : "down";
-  } else if (canSwitch) {
-    if (prev.phase === "down" && chinAboveBar && wristNearBar) nextPhase = "up";
-    if (prev.phase === "up" && elbowsExtended && wristNearBar) nextPhase = "down";
-  }
-
-  let repCount = prev.repCount;
-  let reachedTarget = prev.reachedTarget;
-  let lastRepMs = prev.lastRepMs;
-  let feedback = prev.feedback;
-
-  if (!wristNearBar) {
-    feedback = "Hands must stay on the bar (wrists near the bar line).";
-  } else if (chinAboveBar) {
-    feedback = "Top reached. Lower with control to full extension.";
-  } else if (!elbowsExtended) {
-    feedback = "Go to full extension at the bottom to count.";
-  } else {
-    feedback = "Pull until your chin clears the bar.";
-  }
-
-  if (nextPhase === "up") reachedTarget = true;
-
-  if (prev.phase === "up" && nextPhase === "down") {
-    if (reachedTarget && elbowsExtended && wristNearBar && nowMs - lastRepMs > minRepMs) {
-      repCount += 1;
-      lastRepMs = nowMs;
-      reachedTarget = false;
-    }
-  }
-
-  return {
-    ...prev,
-    repCount,
-    phase: nextPhase,
-    lastPhaseChangeMs: nextPhase !== prev.phase ? nowMs : prev.lastPhaseChangeMs,
-    lastRepMs,
-    reachedTarget,
-    feedback,
-  };
-}
-
 export default function PoseRepCounter() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const smoothedRef = useRef<NormalizedLandmark[] | null>(null);
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
-
-  const [barLine, setBarLine] = useState<BarLine | null>(null);
-  const [barDraft, setBarDraft] = useState<{ x: number; y: number } | null>(null);
-  const [barAuto, setBarAuto] = useState<BarAutoState>({ status: "idle" });
-  const barAutoSamplesRef = useRef<number[]>([]);
 
   const [exercise, setExercise] = useState<ExerciseId>("jumping_jacks");
   const [status, setStatus] = useState<
@@ -602,8 +464,6 @@ export default function PoseRepCounter() {
     lastSide: "none",
     feedback: "",
   }));
-
-  const needsBar = exercise === "pull_ups" || exercise === "chin_ups";
 
   const displayPhase = useMemo(() => {
     if (repState.phase === "unknown") return "No pose";
@@ -625,29 +485,7 @@ export default function PoseRepCounter() {
       lastSide: "none",
       feedback: "",
     }));
-    setBarDraft(null);
-    setBarAuto({ status: "idle" });
-    barAutoSamplesRef.current = [];
   }, [exercise]);
-
-  useEffect(() => {
-    if (!needsBar) {
-      setBarDraft(null);
-      setBarAuto({ status: "idle" });
-      barAutoSamplesRef.current = [];
-    }
-  }, [needsBar]);
-
-  useEffect(() => {
-    // Ensure the "set bar" message goes away immediately after bar is set.
-    if (!needsBar) return;
-    if (!barLine) return;
-    setRepState((s) => ({
-      ...s,
-      feedback: "",
-      phase: s.phase === "unknown" ? "down" : s.phase,
-    }));
-  }, [barLine, needsBar]);
 
   useEffect(() => {
     let landmarker: PoseLandmarker | null = null;
@@ -749,31 +587,6 @@ export default function PoseRepCounter() {
             smoothedRef.current = smoothed;
             lastLandmarksRef.current = smoothed;
 
-            // Auto bar sampling: collect wrist y for a short window and use median.
-            if (needsBar && barAuto.status === "sampling") {
-              const lWrist = getLandmark(smoothed, 15);
-              const rWrist = getLandmark(smoothed, 16);
-              if (isLandmarkConfident(lWrist, 0.35) && isLandmarkConfident(rWrist, 0.35)) {
-                const wristsY = avg(lWrist!.y, rWrist!.y);
-                barAutoSamplesRef.current.push(wristsY);
-              }
-
-              const elapsed = nowMs - barAuto.startedMs;
-              const sampleCount = barAutoSamplesRef.current.length;
-              if (elapsed > 900) {
-                if (sampleCount >= 10) {
-                  const y = clamp(median(barAutoSamplesRef.current) - 0.02, 0.02, 0.98);
-                  setBarLine({ y, x1: 0.05, x2: 0.95 });
-                  setBarAuto({ status: "done" });
-                } else {
-                  setBarAuto({ status: "idle" });
-                }
-                barAutoSamplesRef.current = [];
-              } else {
-                setBarAuto({ status: "sampling", samples: sampleCount, startedMs: barAuto.startedMs });
-              }
-            }
-
             drawingUtils.drawLandmarks(smoothed, {
               radius: (data) => 2 + 3 * clamp01(data.from?.z ? 0 : 1),
               color: "#3cf2b0",
@@ -806,10 +619,6 @@ export default function PoseRepCounter() {
               if (exercise === "squats") return updateSquatState(prev, smoothed, nowMs);
               if (exercise === "lunges") return updateLungeState(prev, smoothed, nowMs);
               if (exercise === "high_knees") return updateHighKneesState(prev, smoothed, nowMs);
-              if (exercise === "pull_ups")
-                return updateBarExerciseState(prev, smoothed, nowMs, barLine, "Pull-ups");
-              if (exercise === "chin_ups")
-                return updateBarExerciseState(prev, smoothed, nowMs, barLine, "Chin-ups");
               return prev;
             });
           } else {
@@ -818,32 +627,6 @@ export default function PoseRepCounter() {
               phase: "unknown",
               feedback: "",
             }));
-          }
-
-          // Draw bar overlay if set
-          if (barLine) {
-            ctx.save();
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.strokeStyle = "rgba(255, 210, 80, 0.95)";
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(barLine.x1 * canvas.width, barLine.y * canvas.height);
-            ctx.lineTo(barLine.x2 * canvas.width, barLine.y * canvas.height);
-            ctx.stroke();
-            ctx.restore();
-          }
-
-          // Draw draft point while setting the bar
-          if (barDraft) {
-            ctx.save();
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.fillStyle = "rgba(255, 210, 80, 0.95)";
-            ctx.beginPath();
-            ctx.arc(barDraft.x * canvas.width, barDraft.y * canvas.height, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
           }
 
           ctx.restore();
@@ -934,8 +717,6 @@ export default function PoseRepCounter() {
                 <option value="squats">Squats</option>
                 <option value="lunges">Lunges</option>
                 <option value="high_knees">High knees</option>
-                <option value="pull_ups">Pull-ups</option>
-                <option value="chin_ups">Chin-ups</option>
               </select>
             </div>
 
@@ -984,59 +765,6 @@ export default function PoseRepCounter() {
             {repState.feedback || "Move into frame to begin."}
           </div>
 
-          {needsBar && (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
-                Bar: {barLine ? `set (y=${barLine.y.toFixed(3)})` : "not set"}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setBarLine(null);
-                  setBarDraft(null);
-                  setBarAuto({ status: "idle" });
-                  barAutoSamplesRef.current = [];
-                }}
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#e6edf6",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                Clear bar
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setBarDraft(null);
-                  barAutoSamplesRef.current = [];
-                  setBarAuto({ status: "sampling", samples: 0, startedMs: performance.now() });
-                }}
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#e6edf6",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                {barAuto.status === "sampling" ? `Auto-setting… (${barAuto.samples})` : "Auto-set bar"}
-              </button>
-
-              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
-                {barDraft
-                  ? "Now click again to finish the bar."
-                  : "Click the video twice to set the bar."}
-              </div>
-            </div>
-          )}
         </div>
 
         <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
@@ -1079,31 +807,6 @@ export default function PoseRepCounter() {
           overflow: "hidden",
           border: "1px solid rgba(255,255,255,0.08)",
           background: "#05070c",
-          cursor: needsBar ? "crosshair" : "default",
-        }}
-        onClick={(ev) => {
-          if (!needsBar) return;
-          const target = ev.currentTarget as HTMLDivElement;
-          const rect = target.getBoundingClientRect();
-          const x = clamp((ev.clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
-          const y = clamp((ev.clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
-
-          // Clicking while auto-sampling cancels auto mode.
-          if (barAuto.status === "sampling") {
-            setBarAuto({ status: "idle" });
-            barAutoSamplesRef.current = [];
-          }
-
-          if (!barDraft) {
-            setBarDraft({ x, y });
-            return;
-          }
-
-          const x1 = clamp(barDraft.x, 0, 1);
-          const x2 = clamp(x, 0, 1);
-          const lineY = clamp((barDraft.y + y) / 2, 0.02, 0.98);
-          setBarLine({ y: lineY, x1: Math.min(x1, x2), x2: Math.max(x1, x2) });
-          setBarDraft(null);
         }}
       >
         <video

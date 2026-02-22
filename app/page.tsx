@@ -1,31 +1,51 @@
-import PoseRepCounter from "@/app/pose/PoseRepCounter";
-
 export default function HomePage() {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-        padding: 16,
-        maxWidth: 980,
-        margin: "0 auto",
-      }}
-    >
-      <header style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <h1 style={{ margin: 0, fontSize: 28, letterSpacing: -0.4 }}>RepDetect</h1>
-        <p style={{ margin: 0, color: "#a7b4c7", lineHeight: 1.4 }}>
-          Camera-based pose detection that counts reps in real time (all processing runs in
-          your browser).
+    <section className="stack">
+      <header className="hero">
+        <div className="hero__badge">Private. In-browser. Real-time.</div>
+        <h1 className="hero__title">RepDetect</h1>
+        <p className="hero__subtitle">
+          A camera-based rep counter that runs entirely in your browser. Pick an exercise,
+          see form cues, and track clean reps.
         </p>
+
+        <div className="hero__actions">
+          <a className="btn btn--primary" href="/workout">
+            Start workout
+          </a>
+          <a className="btn" href="/about">
+            Learn more
+          </a>
+        </div>
       </header>
 
-      <PoseRepCounter />
+      <div className="grid">
+        <div className="card stack">
+          <div className="card__title">Live rep counting</div>
+          <div className="muted">
+            Counts reps using pose estimation with smoothing and anti-cheat rules.
+          </div>
+        </div>
+        <div className="card stack">
+          <div className="card__title">Form cues</div>
+          <div className="muted">
+            On-screen feedback helps you hit full range-of-motion and avoid false counts.
+          </div>
+        </div>
+        <div className="card stack">
+          <div className="card__title">Privacy-first</div>
+          <div className="muted">No uploads. Processing runs locally on your device.</div>
+        </div>
+      </div>
 
-      <footer style={{ color: "#7f8ba0", fontSize: 12, lineHeight: 1.4 }}>
-        This is an MVP. Works best when your full body is visible and the camera is stable.
-      </footer>
-    </main>
+      <div className="card stack">
+        <h2 className="h2">Getting started</h2>
+        <div className="stack">
+          <p className="p">1) Go to Workout and allow camera access.</p>
+          <p className="p">2) Step back so your full body is visible.</p>
+          <p className="p">3) Move with control for the cleanest counts.</p>
+        </div>
+      </div>
+    </section>
   );
 }
