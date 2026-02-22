@@ -14,6 +14,8 @@ type ExerciseId =
   | "lunges"
   | "high_knees";
 
+type DecisionKind = "none" | "rep" | "reject";
+
 type RepState = {
   exercise: ExerciseId;
   repCount: number;
@@ -23,6 +25,47 @@ type RepState = {
   reachedTarget: boolean;
   lastSide: "left" | "right" | "none";
   feedback: string;
+  decisionId: number;
+  decisionKind: DecisionKind;
+  decisionMessage: string;
+};
+
+type RepEvent = {
+  id: string;
+  ts: number;
+  exercise: ExerciseId;
+  kind: Exclude<DecisionKind, "none">;
+  message: string;
+  reps: number;
+};
+
+type JumpingJackCalibration = {
+  openAnkleRatio: number;
+  closedAnkleRatio: number;
+  openArmsLift: number;
+  closedArmsLift: number;
+};
+
+type SquatCalibration = {
+  topKneeAngle: number;
+  bottomKneeAngle: number;
+};
+
+type LungeCalibration = {
+  topKneeAngle: number;
+  bottomKneeAngle: number;
+};
+
+type HighKneesCalibration = {
+  upLift: number;
+  downLift: number;
+};
+
+type Calibration = {
+  jumping_jacks?: JumpingJackCalibration;
+  squats?: SquatCalibration;
+  lunges?: LungeCalibration;
+  high_knees?: HighKneesCalibration;
 };
 
 function formatUnknownError(e: unknown) {
@@ -64,6 +107,11 @@ function formatUnknownError(e: unknown) {
 
 function clamp01(x: number) {
   return Math.min(1, Math.max(0, x));
+}
+
+function newId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function dist(a: NormalizedLandmark, b: NormalizedLandmark) {
@@ -123,7 +171,8 @@ function smoothLandmarks(
 function updateJumpingJackState(
   prev: RepState,
   landmarks: NormalizedLandmark[],
-  nowMs: number
+  nowMs: number,
+  calib?: JumpingJackCalibration
 ): RepState {
   // MediaPipe Pose landmark indices (BlazePose)
   // 11: left shoulder, 12: right shoulder
@@ -163,17 +212,27 @@ function updateJumpingJackState(
   // Arms "up" if wrists are above head/nose region (y smaller = higher)
   const wristsY = avg(lWrist!.y, rWrist!.y);
   const headY = nose!.y;
-  const armsUp = wristsY < headY - 0.03;
+  const armsLift = headY - wristsY;
+
+  const defaultArmsUp = armsLift > 0.03;
 
   // Legs "open" if feet are spread wide relative to shoulders
   // Use hysteresis thresholds
-  const legsOpenEnter = 1.45;
-  const legsOpenExit = 1.25;
+  const openEnter = calib ? calib.openAnkleRatio : 1.45;
+  const openExit = calib ? Math.min(calib.openAnkleRatio, Math.max(calib.closedAnkleRatio, 1.1)) : 1.25;
+  const legsOpenEnter = openEnter;
+  const legsOpenExit = openExit;
 
   const legsOpen =
     prev.phase === "open"
       ? ankleToShoulderRatio > legsOpenExit
       : ankleToShoulderRatio > legsOpenEnter;
+
+  const armsUp = calib
+    ? prev.phase === "open"
+      ? armsLift > calib.openArmsLift * 0.7
+      : armsLift > calib.openArmsLift * 0.85
+    : defaultArmsUp;
 
   // Combine into overall "open" phase
   const open = armsUp && legsOpen;
@@ -196,13 +255,27 @@ function updateJumpingJackState(
   let reachedTarget = prev.reachedTarget;
   let lastRepMs = prev.lastRepMs;
   let feedback = prev.feedback;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
 
   if (nextPhase === "open") reachedTarget = true;
 
+  const openness = calib
+    ? clamp01(
+        (ankleToShoulderRatio - calib.closedAnkleRatio) /
+          Math.max(calib.openAnkleRatio - calib.closedAnkleRatio, 1e-6)
+      )
+    : clamp01((ankleToShoulderRatio - 1.15) / 0.5);
+
+  const liftPct = calib
+    ? clamp01((armsLift - calib.closedArmsLift) / Math.max(calib.openArmsLift - calib.closedArmsLift, 1e-6))
+    : clamp01((armsLift - 0.02) / 0.08);
+
   if (open) {
-    feedback = "Good. Fully extend arms and step wide.";
+    feedback = `Open: ${(openness * 100).toFixed(0)}% legs, ${(liftPct * 100).toFixed(0)}% arms.`;
   } else {
-    feedback = "Raise arms above head and step wider to count.";
+    feedback = `Aim for: ${(openness * 100).toFixed(0)}% legs, ${(liftPct * 100).toFixed(0)}% arms.`;
   }
 
   if (prev.phase === "open" && nextPhase === "closed") {
@@ -210,6 +283,13 @@ function updateJumpingJackState(
       repCount += 1;
       lastRepMs = nowMs;
       reachedTarget = false;
+      decisionId += 1;
+      decisionKind = "rep";
+      decisionMessage = "Rep counted.";
+    } else {
+      decisionId += 1;
+      decisionKind = "reject";
+      decisionMessage = reachedTarget ? "Too fast. Slow down." : "Didn’t reach full open position.";
     }
   }
 
@@ -221,10 +301,18 @@ function updateJumpingJackState(
     lastRepMs,
     reachedTarget,
     feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
   };
 }
 
-function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+function updateSquatState(
+  prev: RepState,
+  landmarks: NormalizedLandmark[],
+  nowMs: number,
+  calib?: SquatCalibration
+): RepState {
   // 23/24: hips, 25/26: knees, 27/28: ankles
   const lHip = getLandmark(landmarks, 23);
   const rHip = getLandmark(landmarks, 24);
@@ -249,11 +337,12 @@ function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   const rKneeAngle = angleDeg(rHip!, rKnee!, rAnkle!);
   const kneeAngle = Math.min(lKneeAngle, rKneeAngle);
 
-  // Hysteresis thresholds for squat depth
-  const downEnter = 115;
-  const downExit = 135;
-  const upEnter = 165;
-  const upExit = 155;
+  const top = calib ? calib.topKneeAngle : 175;
+  const bottom = calib ? calib.bottomKneeAngle : 110;
+  const downEnter = calib ? bottom + 10 : 115;
+  const downExit = calib ? bottom + 25 : 135;
+  const upEnter = calib ? top - 8 : 165;
+  const upExit = calib ? top - 18 : 155;
   const minRepMs = 700;
 
   const isDown =
@@ -281,22 +370,29 @@ function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   let reachedTarget = prev.reachedTarget;
   let lastRepMs = prev.lastRepMs;
   let feedback = prev.feedback;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
 
   if (nextPhase === "down") reachedTarget = true;
 
-  if (kneeAngle < downEnter) {
-    feedback = "Good depth. Drive up.";
-  } else if (kneeAngle < 140) {
-    feedback = "Go a bit lower for a full rep.";
-  } else {
-    feedback = "Stand tall, then squat down.";
-  }
+  const depthPct = clamp01((top - kneeAngle) / Math.max(top - bottom, 1e-6));
+  if (kneeAngle < downEnter) feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (bottom). Drive up.`;
+  else if (depthPct > 0.45) feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (go lower).`;
+  else feedback = `Depth: ${(depthPct * 100).toFixed(0)}% (start).`;
 
   if (prev.phase === "down" && nextPhase === "up") {
     if (reachedTarget && nowMs - lastRepMs > minRepMs) {
       repCount += 1;
       lastRepMs = nowMs;
       reachedTarget = false;
+      decisionId += 1;
+      decisionKind = "rep";
+      decisionMessage = "Rep counted.";
+    } else {
+      decisionId += 1;
+      decisionKind = "reject";
+      decisionMessage = reachedTarget ? "Too fast. Slow down." : "Not deep enough.";
     }
   }
 
@@ -308,10 +404,18 @@ function updateSquatState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
     lastRepMs,
     reachedTarget,
     feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
   };
 }
 
-function updateLungeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+function updateLungeState(
+  prev: RepState,
+  landmarks: NormalizedLandmark[],
+  nowMs: number,
+  calib?: LungeCalibration
+): RepState {
   const lHip = getLandmark(landmarks, 23);
   const rHip = getLandmark(landmarks, 24);
   const lKnee = getLandmark(landmarks, 25);
@@ -335,10 +439,12 @@ function updateLungeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   const activeSide: "left" | "right" = leftAngle < rightAngle ? "left" : "right";
   const activeAngle = Math.min(leftAngle, rightAngle);
 
-  const downEnter = 120;
-  const downExit = 140;
-  const upEnter = 170;
-  const upExit = 160;
+  const top = calib ? calib.topKneeAngle : 175;
+  const bottom = calib ? calib.bottomKneeAngle : 115;
+  const downEnter = calib ? bottom + 10 : 120;
+  const downExit = calib ? bottom + 25 : 140;
+  const upEnter = calib ? top - 8 : 170;
+  const upExit = calib ? top - 18 : 160;
   const minPhaseMs = 220;
   const minRepMs = 750;
   const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
@@ -357,11 +463,15 @@ function updateLungeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
   let reachedTarget = prev.reachedTarget;
   let lastRepMs = prev.lastRepMs;
   let lastSide = prev.lastSide;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
 
   let feedback = prev.feedback;
-  if (activeAngle < downEnter) feedback = `Good lunge (${activeSide}). Push back up.`;
-  else if (activeAngle < 150) feedback = `Go a bit lower (${activeSide}) for a full rep.`;
-  else feedback = "Take a longer step and lunge down.";
+  const depthPct = clamp01((top - activeAngle) / Math.max(top - bottom, 1e-6));
+  if (activeAngle < downEnter) feedback = `Lunge (${activeSide}) depth: ${(depthPct * 100).toFixed(0)}%. Push up.`;
+  else if (depthPct > 0.45) feedback = `Lunge (${activeSide}) depth: ${(depthPct * 100).toFixed(0)}%. Go lower.`;
+  else feedback = `Lunge (${activeSide}) depth: ${(depthPct * 100).toFixed(0)}%.`;
 
   if (nextPhase === "down") {
     reachedTarget = true;
@@ -385,10 +495,18 @@ function updateLungeState(prev: RepState, landmarks: NormalizedLandmark[], nowMs
     reachedTarget,
     lastSide,
     feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
   };
 }
 
-function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], nowMs: number): RepState {
+function updateHighKneesState(
+  prev: RepState,
+  landmarks: NormalizedLandmark[],
+  nowMs: number,
+  calib?: HighKneesCalibration
+): RepState {
   const lHip = getLandmark(landmarks, 23);
   const rHip = getLandmark(landmarks, 24);
   const lKnee = getLandmark(landmarks, 25);
@@ -403,8 +521,12 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
   if (!minVisible) return { ...prev, phase: "unknown", feedback: "Make sure hips and knees are visible." };
 
   const hipY = avg(lHip!.y, rHip!.y);
-  const leftUp = lKnee!.y < hipY - 0.05;
-  const rightUp = rKnee!.y < hipY - 0.05;
+  const leftLift = hipY - lKnee!.y;
+  const rightLift = hipY - rKnee!.y;
+  const upThreshold = calib ? (calib.upLift + calib.downLift) / 2 : 0.05;
+
+  const leftUp = leftLift > upThreshold;
+  const rightUp = rightLift > upThreshold;
 
   const sideUp: "left" | "right" | "none" = leftUp && !rightUp ? "left" : rightUp && !leftUp ? "right" : "none";
   const minRepMs = 300;
@@ -413,12 +535,17 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
   let lastRepMs = prev.lastRepMs;
   let lastSide = prev.lastSide;
   let feedback = prev.feedback;
+  let decisionId = prev.decisionId;
+  let decisionKind: DecisionKind = "none";
+  let decisionMessage = "";
 
-  if (sideUp === "none") {
-    feedback = "Drive one knee up above hip height.";
-  } else {
-    feedback = `Knee up (${sideUp}). Keep alternating.`;
-  }
+  const lift = Math.max(leftLift, rightLift);
+  const liftPct = calib
+    ? clamp01((lift - calib.downLift) / Math.max(calib.upLift - calib.downLift, 1e-6))
+    : clamp01((lift - 0.02) / 0.12);
+
+  if (sideUp === "none") feedback = `Lift: ${(liftPct * 100).toFixed(0)}%. Drive one knee higher.`;
+  else feedback = `Lift: ${(liftPct * 100).toFixed(0)}%. Knee up (${sideUp}). Alternate.`;
 
   if (sideUp !== "none") {
     const canCount = nowMs - lastRepMs > minRepMs;
@@ -427,6 +554,13 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
       repCount += 1;
       lastRepMs = nowMs;
       lastSide = sideUp;
+      decisionId += 1;
+      decisionKind = "rep";
+      decisionMessage = "Rep counted.";
+    } else if (canCount && !alternated) {
+      decisionId += 1;
+      decisionKind = "reject";
+      decisionMessage = "Alternate legs for clean reps.";
     }
   }
 
@@ -439,6 +573,9 @@ function updateHighKneesState(prev: RepState, landmarks: NormalizedLandmark[], n
     reachedTarget: true,
     lastSide,
     feedback,
+    decisionId,
+    decisionKind,
+    decisionMessage,
   };
 }
 
@@ -449,6 +586,11 @@ export default function PoseRepCounter() {
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
 
   const [exercise, setExercise] = useState<ExerciseId>("jumping_jacks");
+  const [sessionRunning, setSessionRunning] = useState<boolean>(true);
+  const [calibration, setCalibration] = useState<Calibration>({});
+  const [events, setEvents] = useState<RepEvent[]>([]);
+  const [calibOpen, setCalibOpen] = useState(false);
+  const [calibStep, setCalibStep] = useState<0 | 1>(0);
   const [status, setStatus] = useState<
     "idle" | "loading_model" | "requesting_camera" | "running" | "error"
   >("idle");
@@ -463,6 +605,9 @@ export default function PoseRepCounter() {
     reachedTarget: false,
     lastSide: "none",
     feedback: "",
+    decisionId: 0,
+    decisionKind: "none",
+    decisionMessage: "",
   }));
 
   const displayPhase = useMemo(() => {
@@ -472,6 +617,216 @@ export default function PoseRepCounter() {
     if (repState.phase === "up") return "Up";
     return "Down";
   }, [repState.phase]);
+
+  const calibSteps = useMemo(() => {
+    if (exercise === "jumping_jacks") {
+      return [
+        {
+          title: "Closed position",
+          hint: "Stand with feet together and arms down.",
+          actionLabel: "Capture closed",
+        },
+        {
+          title: "Open position",
+          hint: "Do a full jumping jack: feet wide and arms overhead.",
+          actionLabel: "Capture open",
+        },
+      ] as const;
+    }
+
+    if (exercise === "high_knees") {
+      return [
+        {
+          title: "Rest position",
+          hint: "Stand tall with both feet on the ground.",
+          actionLabel: "Capture rest",
+        },
+        {
+          title: "Knee-up position",
+          hint: "Lift one knee as high as you can (above hip if possible).",
+          actionLabel: "Capture knee-up",
+        },
+      ] as const;
+    }
+
+    return [
+      {
+        title: "Top position",
+        hint: "Stand tall (top of rep).",
+        actionLabel: "Capture top",
+      },
+      {
+        title: "Bottom position",
+        hint: "Go to your deepest position (bottom of rep).",
+        actionLabel: "Capture bottom",
+      },
+    ] as const;
+  }, [exercise]);
+
+  function captureCalibrationFrame(step: 0 | 1) {
+    const lms = lastLandmarksRef.current;
+    if (!lms) return;
+
+    if (exercise === "squats") {
+      const lHip = getLandmark(lms, 23);
+      const rHip = getLandmark(lms, 24);
+      const lKnee = getLandmark(lms, 25);
+      const rKnee = getLandmark(lms, 26);
+      const lAnkle = getLandmark(lms, 27);
+      const rAnkle = getLandmark(lms, 28);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35)
+      )
+        return;
+
+      const lAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+      const rAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+      const angle = Math.min(lAngle, rAngle);
+
+      setCalibration((c) => ({
+        ...c,
+        squats: {
+          topKneeAngle: step === 0 ? angle : c.squats?.topKneeAngle ?? 175,
+          bottomKneeAngle: step === 1 ? angle : c.squats?.bottomKneeAngle ?? 110,
+        },
+      }));
+
+      return;
+    }
+
+    if (exercise === "lunges") {
+      const lHip = getLandmark(lms, 23);
+      const rHip = getLandmark(lms, 24);
+      const lKnee = getLandmark(lms, 25);
+      const rKnee = getLandmark(lms, 26);
+      const lAnkle = getLandmark(lms, 27);
+      const rAnkle = getLandmark(lms, 28);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35)
+      )
+        return;
+
+      const lAngle = angleDeg(lHip!, lKnee!, lAnkle!);
+      const rAngle = angleDeg(rHip!, rKnee!, rAnkle!);
+      const angle = Math.min(lAngle, rAngle);
+
+      setCalibration((c) => ({
+        ...c,
+        lunges: {
+          topKneeAngle: step === 0 ? angle : c.lunges?.topKneeAngle ?? 175,
+          bottomKneeAngle: step === 1 ? angle : c.lunges?.bottomKneeAngle ?? 115,
+        },
+      }));
+
+      return;
+    }
+
+    if (exercise === "jumping_jacks") {
+      const lShoulder = getLandmark(lms, 11);
+      const rShoulder = getLandmark(lms, 12);
+      const lWrist = getLandmark(lms, 15);
+      const rWrist = getLandmark(lms, 16);
+      const lAnkle = getLandmark(lms, 27);
+      const rAnkle = getLandmark(lms, 28);
+      const nose = getLandmark(lms, 0);
+      if (
+        !isLandmarkConfident(lShoulder, 0.35) ||
+        !isLandmarkConfident(rShoulder, 0.35) ||
+        !isLandmarkConfident(lWrist, 0.35) ||
+        !isLandmarkConfident(rWrist, 0.35) ||
+        !isLandmarkConfident(lAnkle, 0.35) ||
+        !isLandmarkConfident(rAnkle, 0.35) ||
+        !isLandmarkConfident(nose, 0.35)
+      )
+        return;
+
+      const shoulderWidth = dist(lShoulder!, rShoulder!);
+      const ankleWidth = dist(lAnkle!, rAnkle!);
+      const ratio = ankleWidth / Math.max(shoulderWidth, 1e-6);
+      const headY = nose!.y;
+      const wristsY = avg(lWrist!.y, rWrist!.y);
+      const lift = headY - wristsY;
+
+      setCalibration((c) => ({
+        ...c,
+        jumping_jacks: {
+          openAnkleRatio: step === 1 ? ratio : c.jumping_jacks?.openAnkleRatio ?? 1.45,
+          closedAnkleRatio: step === 0 ? ratio : c.jumping_jacks?.closedAnkleRatio ?? 1.15,
+          openArmsLift: step === 1 ? lift : c.jumping_jacks?.openArmsLift ?? 0.08,
+          closedArmsLift: step === 0 ? lift : c.jumping_jacks?.closedArmsLift ?? 0.02,
+        },
+      }));
+
+      return;
+    }
+
+    if (exercise === "high_knees") {
+      const lHip = getLandmark(lms, 23);
+      const rHip = getLandmark(lms, 24);
+      const lKnee = getLandmark(lms, 25);
+      const rKnee = getLandmark(lms, 26);
+      if (
+        !isLandmarkConfident(lHip, 0.35) ||
+        !isLandmarkConfident(rHip, 0.35) ||
+        !isLandmarkConfident(lKnee, 0.35) ||
+        !isLandmarkConfident(rKnee, 0.35)
+      )
+        return;
+
+      const hipY = avg(lHip!.y, rHip!.y);
+      const lift = Math.max(hipY - lKnee!.y, hipY - rKnee!.y);
+
+      setCalibration((c) => ({
+        ...c,
+        high_knees: {
+          upLift: step === 1 ? lift : c.high_knees?.upLift ?? 0.1,
+          downLift: step === 0 ? lift : c.high_knees?.downLift ?? 0.02,
+        },
+      }));
+
+      return;
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("repdetect:v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        exercise?: ExerciseId;
+        calibration?: Calibration;
+      };
+
+      if (parsed.exercise) setExercise(parsed.exercise);
+      if (parsed.calibration) setCalibration(parsed.calibration);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "repdetect:v1",
+        JSON.stringify({
+          exercise,
+          calibration,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [exercise, calibration]);
 
   useEffect(() => {
     setRepState((s) => ({
@@ -484,8 +839,30 @@ export default function PoseRepCounter() {
       reachedTarget: false,
       lastSide: "none",
       feedback: "",
+      decisionId: 0,
+      decisionKind: "none",
+      decisionMessage: "",
     }));
+    setEvents([]);
   }, [exercise]);
+
+  useEffect(() => {
+    if (repState.decisionKind === "none") return;
+    if (!repState.decisionMessage) return;
+
+    setEvents((prev) => {
+      const next: RepEvent = {
+        id: newId(),
+        ts: Date.now(),
+        exercise,
+        kind: repState.decisionKind === "rep" ? "rep" : "reject",
+        message: repState.decisionMessage,
+        reps: repState.repCount,
+      };
+      const merged = [next, ...prev];
+      return merged.slice(0, 12);
+    });
+  }, [repState.decisionId]);
 
   useEffect(() => {
     let landmarker: PoseLandmarker | null = null;
@@ -612,13 +989,29 @@ export default function PoseRepCounter() {
                   reachedTarget: false,
                   lastSide: "none",
                   feedback: "",
+                  decisionId: 0,
+                  decisionKind: "none",
+                  decisionMessage: "",
                 };
               }
 
-              if (exercise === "jumping_jacks") return updateJumpingJackState(prev, smoothed, nowMs);
-              if (exercise === "squats") return updateSquatState(prev, smoothed, nowMs);
-              if (exercise === "lunges") return updateLungeState(prev, smoothed, nowMs);
-              if (exercise === "high_knees") return updateHighKneesState(prev, smoothed, nowMs);
+              if (!sessionRunning) {
+                return {
+                  ...prev,
+                  feedback: "Paused.",
+                  decisionKind: "none",
+                  decisionMessage: "",
+                };
+              }
+
+              if (exercise === "jumping_jacks")
+                return updateJumpingJackState(prev, smoothed, nowMs, calibration.jumping_jacks);
+              if (exercise === "squats")
+                return updateSquatState(prev, smoothed, nowMs, calibration.squats);
+              if (exercise === "lunges")
+                return updateLungeState(prev, smoothed, nowMs, calibration.lunges);
+              if (exercise === "high_knees")
+                return updateHighKneesState(prev, smoothed, nowMs, calibration.high_knees);
               return prev;
             });
           } else {
@@ -722,6 +1115,23 @@ export default function PoseRepCounter() {
 
             <button
               type="button"
+              onClick={() => setSessionRunning((s) => !s)}
+              style={{
+                background: sessionRunning ? "rgba(255,255,255,0.06)" : "rgba(60, 242, 176, 0.14)",
+                color: "#e6edf6",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 14,
+                cursor: "pointer",
+                alignSelf: "end",
+              }}
+            >
+              {sessionRunning ? "Pause" : "Resume"}
+            </button>
+
+            <button
+              type="button"
               onClick={() =>
                 setRepState((s) => ({
                   ...s,
@@ -765,6 +1175,208 @@ export default function PoseRepCounter() {
             {repState.feedback || "Move into frame to begin."}
           </div>
 
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              gridTemplateColumns: "1fr",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12,
+              padding: 12,
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Calibration</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCalibStep(0);
+                    setCalibOpen(true);
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e6edf6",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Calibrate
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCalibration((c) => ({
+                      ...c,
+                      [exercise]: undefined,
+                    }))
+                  }
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e6edf6",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+              Recommended: calibrate once per exercise for the cleanest depth and fewer false counts.
+            </div>
+          </div>
+
+          {calibOpen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.55)",
+                display: "grid",
+                placeItems: "center",
+                padding: 16,
+                zIndex: 50,
+              }}
+              onClick={() => setCalibOpen(false)}
+            >
+              <div
+                className="card"
+                style={{
+                  width: "min(680px, 100%)",
+                  padding: 16,
+                  display: "grid",
+                  gap: 12,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <div style={{ fontSize: 12, color: "#a7b4c7" }}>Calibration</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.2 }}>
+                      {exercise.replace("_", " ")}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCalibOpen(false)}
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      color: "#e6edf6",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 12 }}>
+                  <div style={{ fontWeight: 800 }}>{`Step ${calibStep + 1}/2: ${calibSteps[calibStep].title}`}</div>
+                  <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                    {calibSteps[calibStep].hint}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      captureCalibrationFrame(calibStep);
+                      if (calibStep === 0) setCalibStep(1);
+                      else setCalibOpen(false);
+                    }}
+                    style={{
+                      background: "rgba(60, 242, 176, 0.14)",
+                      color: "#e6edf6",
+                      border: "1px solid rgba(60, 242, 176, 0.35)",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      cursor: "pointer",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {calibSteps[calibStep].actionLabel}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCalibStep((s) => (s === 0 ? 1 : 0))}
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      color: "#e6edf6",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {calibStep === 0 ? "Skip to step 2" : "Back to step 1"}
+                  </button>
+                </div>
+
+                <div className="muted" style={{ fontSize: 12 }}>
+                  Tip: Keep your full body in frame and hold the position still for 1 second before capturing.
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12,
+              padding: 12,
+              background: "rgba(255,255,255,0.02)",
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#a7b4c7" }}>Rep log</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {events.length === 0 ? (
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>No events yet.</div>
+              ) : (
+                events.map((ev) => (
+                  <div
+                    key={ev.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      fontSize: 12,
+                      color: ev.kind === "rep" ? "#d6ffe9" : "#ffd0d0",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "rgba(0,0,0,0.18)",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {ev.kind === "rep" ? `+1 rep (${ev.reps})` : "Rejected"}: {ev.message}
+                    </div>
+                    <div style={{ color: "#a7b4c7", flex: "0 0 auto" }}>
+                      {new Date(ev.ts).toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
