@@ -7,6 +7,7 @@ import {
   type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { appendSession, type WorkoutSession } from "@/app/lib/workoutHistory";
 
 type ExerciseId =
   | "jumping_jacks"
@@ -94,6 +95,11 @@ type WorkoutPlan = {
   name: string;
   steps: WorkoutStep[];
 };
+
+function randomId(prefix: string) {
+  const rnd = Math.random().toString(16).slice(2);
+  return `${prefix}_${Date.now().toString(16)}_${rnd}`;
+}
 
 function formatUnknownError(e: unknown) {
   if (e instanceof Error) {
@@ -882,6 +888,14 @@ export default function PoseRepCounter() {
   }>(() => ({ active: false, planId: "starter_cardio", stepIndex: 0, stepStartedAt: 0, stepStartReps: 0 }));
   const [planNowMs, setPlanNowMs] = useState<number>(0);
 
+  const sessionRef = useRef<{
+    startedAt: number;
+    repsByExercise: Record<string, number>;
+    totalRejects: number;
+  }>({ startedAt: Date.now(), repsByExercise: {}, totalRejects: 0 });
+
+  const planRunRef = useRef<{ startedAt: number } | null>(null);
+
   function showToast(message: string) {
     setToast(message);
     if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
@@ -889,6 +903,41 @@ export default function PoseRepCounter() {
       setToast(null);
       toastTimeoutRef.current = null;
     }, 1400);
+  }
+
+  function resetFreeSession() {
+    sessionRef.current = {
+      startedAt: Date.now(),
+      repsByExercise: {},
+      totalRejects: 0,
+    };
+  }
+
+  function saveSession(mode: "free" | "plan", plan?: { id: string; name: string }) {
+    const startedAt =
+      mode === "plan" ? planRunRef.current?.startedAt ?? Date.now() : sessionRef.current.startedAt;
+    const endedAt = Date.now();
+    const repsByExercise = sessionRef.current.repsByExercise;
+    const totalReps = Object.values(repsByExercise).reduce((a, b) => a + b, 0);
+
+    const next: WorkoutSession = {
+      id: randomId("sess"),
+      startedAt,
+      endedAt,
+      durationSec: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
+      mode,
+      planId: plan?.id,
+      planName: plan?.name,
+      totalReps,
+      totalRejects: sessionRef.current.totalRejects,
+      repsByExercise,
+    };
+
+    appendSession(next);
+    showToast(mode === "plan" ? "Saved to History" : "Session saved");
+
+    if (mode === "free") resetFreeSession();
+    if (mode === "plan") planRunRef.current = null;
   }
 
   const calibSteps = useMemo(() => {
@@ -1206,6 +1255,14 @@ export default function PoseRepCounter() {
     if (repState.decisionKind === "none") return;
     if (!repState.decisionMessage) return;
 
+    if (repState.decisionKind === "rep") {
+      const ex = exerciseRef.current;
+      sessionRef.current.repsByExercise[ex] = (sessionRef.current.repsByExercise[ex] ?? 0) + 1;
+    }
+    if (repState.decisionKind === "reject") {
+      sessionRef.current.totalRejects += 1;
+    }
+
     const kind = repState.decisionKind === "rep" ? "rep" : "reject";
 
     if (kind === "rep") {
@@ -1256,6 +1313,7 @@ export default function PoseRepCounter() {
         const nextIndex = planState.stepIndex + 1;
         if (nextIndex >= activePlan.steps.length) {
           showToast("Workout complete");
+          saveSession("plan", { id: activePlan.id, name: activePlan.name });
           setPlanState((s) => ({ ...s, active: false }));
           return;
         }
@@ -1732,9 +1790,12 @@ export default function PoseRepCounter() {
                   if (planState.active) {
                     setPlanState((s) => ({ ...s, active: false }));
                     showToast("Plan stopped");
+                    planRunRef.current = null;
                     return;
                   }
 
+                  planRunRef.current = { startedAt: Date.now() };
+                  resetFreeSession();
                   setPlanState({
                     active: true,
                     planId: selectedPlanId,
@@ -1789,6 +1850,26 @@ export default function PoseRepCounter() {
             >
               Reset
             </button>
+
+            {planMode === "free" && (
+              <button
+                type="button"
+                onClick={() => saveSession("free")}
+                style={{
+                  background: "rgba(60, 242, 176, 0.14)",
+                  color: "#e6edf6",
+                  border: "1px solid rgba(60, 242, 176, 0.35)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  alignSelf: "end",
+                  fontWeight: 800,
+                }}
+              >
+                Save session
+              </button>
+            )}
           </div>
 
           <div

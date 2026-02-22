@@ -22,6 +22,13 @@ export default function NavBar() {
             Workout
           </Link>
           <Link
+            className={`nav__link${pathname === "/history" ? " nav__link--active" : ""}`}
+            href="/history"
+            aria-current={pathname === "/history" ? "page" : undefined}
+          >
+            History
+          </Link>
+          <Link
             className={`nav__link${pathname === "/about" ? " nav__link--active" : ""}`}
             href="/about"
             aria-current={pathname === "/about" ? "page" : undefined}
