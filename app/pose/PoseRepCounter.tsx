@@ -801,7 +801,7 @@ export default function PoseRepCounter() {
   const smoothedRef = useRef<NormalizedLandmark[] | null>(null);
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
 
-  const [exercise, setExercise] = useState<ExerciseId>("jumping_jacks");
+  const [exercise, setExercise] = useState<ExerciseId>("squats");
   const [sessionRunning, setSessionRunning] = useState<boolean>(true);
   const [calibration, setCalibration] = useState<Calibration>({});
   const [events, setEvents] = useState<RepEvent[]>([]);
@@ -856,7 +856,7 @@ export default function PoseRepCounter() {
   }, []);
 
   const [repState, setRepState] = useState<RepState>(() => ({
-    exercise: "jumping_jacks",
+    exercise: "squats",
     repCount: 0,
     phase: "unknown",
     lastPhaseChangeMs: 0,
