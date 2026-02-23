@@ -57,7 +57,7 @@ export default function HomePage() {
           <h2 className="h2">Designed for real rooms</h2>
           <div className="stack">
             <p className="p">Works best with even lighting and a stable camera angle.</p>
-            <p className="p">If tracking feels jumpy, pause, reposition, and recalibrate.</p>
+            <p className="p">If tracking feels jumpy, pause, reposition, or enable calibration in Settings.</p>
           </div>
         </div>
       </div>

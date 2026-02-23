@@ -12,8 +12,8 @@ export default function AboutPage() {
         <div className="card stack">
           <h2 className="h2">What it does</h2>
           <p className="p">
-            You pick an exercise, calibrate your range-of-motion, and RepDetect counts clean
-            reps while showing live form cues.
+            You pick an exercise, optionally calibrate in Settings for tighter tracking, and RepDetect
+            counts clean reps while showing live form cues.
           </p>
         </div>
         <div className="card stack">

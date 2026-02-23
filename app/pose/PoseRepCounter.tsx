@@ -2068,25 +2068,11 @@ export default function PoseRepCounter() {
             <div
               role="dialog"
               aria-modal="true"
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.55)",
-                display: "grid",
-                placeItems: "center",
-                padding: 16,
-                zIndex: 50,
-              }}
+              className="modalBackdrop"
               onClick={() => setManualCalibOpen(false)}
             >
               <div
-                className="card"
-                style={{
-                  width: "min(680px, 100%)",
-                  padding: 16,
-                  display: "grid",
-                  gap: 12,
-                }}
+                className="modalCard"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
@@ -2228,21 +2214,7 @@ export default function PoseRepCounter() {
         </div>
 
         {toast && (
-          <div
-            style={{
-              position: "fixed",
-              right: 16,
-              bottom: 16,
-              zIndex: 60,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(0,0,0,0.7)",
-              color: "#e6edf6",
-              padding: "10px 12px",
-              fontSize: 13,
-              maxWidth: 280,
-            }}
-          >
+          <div className="toast">
             {toast}
           </div>
         )}
