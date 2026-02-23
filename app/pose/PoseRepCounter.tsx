@@ -222,13 +222,13 @@ function updateJumpingJackState(
   const nose = getLandmark(landmarks, 0);
 
   const minVisible =
-    isLandmarkConfident(lShoulder) &&
-    isLandmarkConfident(rShoulder) &&
-    isLandmarkConfident(lWrist, 0.4) &&
-    isLandmarkConfident(rWrist, 0.4) &&
-    isLandmarkConfident(lAnkle, 0.4) &&
-    isLandmarkConfident(rAnkle, 0.4) &&
-    isLandmarkConfident(nose, 0.4);
+    isLandmarkConfident(lShoulder, 0.35) &&
+    isLandmarkConfident(rShoulder, 0.35) &&
+    isLandmarkConfident(lWrist, 0.25) &&
+    isLandmarkConfident(rWrist, 0.25) &&
+    isLandmarkConfident(lAnkle, 0.25) &&
+    isLandmarkConfident(rAnkle, 0.25) &&
+    isLandmarkConfident(nose, 0.25);
 
   if (!minVisible) {
     return {
@@ -248,12 +248,14 @@ function updateJumpingJackState(
   const headY = nose!.y;
   const armsLift = headY - wristsY;
 
-  const defaultArmsUp = armsLift > 0.03;
+  const defaultArmsUp = armsLift > 0.02;
 
   // Legs "open" if feet are spread wide relative to shoulders
   // Use hysteresis thresholds
-  const openEnter = calib ? calib.openAnkleRatio : 1.45;
-  const openExit = calib ? Math.min(calib.openAnkleRatio, Math.max(calib.closedAnkleRatio, 1.1)) : 1.25;
+  const openEnter = calib ? calib.openAnkleRatio * 0.96 : 1.35;
+  const openExit = calib
+    ? Math.min(openEnter * 0.88, Math.max((calib.closedAnkleRatio ?? 1.1) * 1.04, 1.12))
+    : 1.18;
   const legsOpenEnter = openEnter;
   const legsOpenExit = openExit;
 
@@ -264,8 +266,8 @@ function updateJumpingJackState(
 
   const armsUp = calib
     ? prev.phase === "open"
-      ? armsLift > calib.openArmsLift * 0.7
-      : armsLift > calib.openArmsLift * 0.85
+      ? armsLift > calib.openArmsLift * 0.6
+      : armsLift > calib.openArmsLift * 0.75
     : defaultArmsUp;
 
   // Combine into overall "open" phase
@@ -275,7 +277,7 @@ function updateJumpingJackState(
   // Timing: ignore ultra-fast toggles from jitter
   const minPhaseMs = 180;
   const canSwitch = nowMs - prev.lastPhaseChangeMs > minPhaseMs;
-  const minRepMs = 500;
+  const minRepMs = 400;
 
   let nextPhase = prev.phase;
   if (prev.phase === "unknown") {
