@@ -8,6 +8,7 @@ import {
 } from "@mediapipe/tasks-vision";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appendSession, type WorkoutSession } from "@/app/lib/workoutHistory";
+import { loadSettings } from "@/app/lib/settings";
 
 type ExerciseId =
   | "jumping_jacks"
@@ -807,6 +808,9 @@ export default function PoseRepCounter() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
 
+  const [calibrationEnabled, setCalibrationEnabled] = useState<boolean>(false);
+  const calibrationEnabledRef = useRef<boolean>(false);
+
   const exerciseRef = useRef<ExerciseId>(exercise);
   const sessionRunningRef = useRef<boolean>(sessionRunning);
   const calibrationRef = useRef<Calibration>(calibration);
@@ -822,6 +826,32 @@ export default function PoseRepCounter() {
     "idle" | "loading_model" | "requesting_camera" | "running" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const read = () => {
+      const enabled = loadSettings().calibrationEnabled;
+      setCalibrationEnabled(enabled);
+      calibrationEnabledRef.current = enabled;
+
+      if (!enabled) {
+        setManualCalibOpen(false);
+        setAutoCalib((s) => ({
+          ...s,
+          active: false,
+          stableMs: 0,
+          lastOkMs: 0,
+        }));
+      }
+    };
+
+    read();
+    window.addEventListener("storage", read);
+    window.addEventListener("repdetect:settings", read);
+    return () => {
+      window.removeEventListener("storage", read);
+      window.removeEventListener("repdetect:settings", read);
+    };
+  }, []);
 
   const [repState, setRepState] = useState<RepState>(() => ({
     exercise: "jumping_jacks",
@@ -1007,6 +1037,18 @@ export default function PoseRepCounter() {
   }, [autoCalib.step, exercise]);
 
   useEffect(() => {
+    if (!calibrationEnabledRef.current) {
+      setAutoCalib((s) => ({
+        ...s,
+        active: false,
+        step: 0,
+        stableMs: 0,
+        lastOkMs: 0,
+        lastCaptureMs: 0,
+      }));
+      return;
+    }
+
     const hasCalib = exercise === "burpees" ? true : Boolean(calibration[exercise]);
     setAutoCalib((s) => ({
       ...s,
@@ -1527,7 +1569,7 @@ export default function PoseRepCounter() {
             lastLandmarksRef.current = smoothed;
 
             // Hands-free calibration: when missing calibration, wait for stable poses and capture automatically.
-            if (autoCalib.active) {
+            if (autoCalib.active && calibrationEnabledRef.current) {
               const ok = isPoseStableForAutoCalibration(smoothed, autoCalib.step);
               const stableNeededMs = 900;
               const now = nowMs;
@@ -1926,97 +1968,99 @@ export default function PoseRepCounter() {
             </div>
           )}
 
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              gridTemplateColumns: "1fr",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 12,
-              padding: 12,
-              background: "rgba(255,255,255,0.02)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Calibration</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualCalibStep(0);
-                    setManualCalibOpen(true);
-                  }}
-                  disabled={exercise === "burpees"}
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e6edf6",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    opacity: exercise === "burpees" ? 0.6 : 1,
-                  }}
-                >
-                  Manual calibrate
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCalibration((c) => ({
-                      ...c,
-                      [exercise]: undefined,
-                    }))
-                  }
-                  disabled={exercise === "burpees"}
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e6edf6",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    opacity: exercise === "burpees" ? 0.6 : 1,
-                  }}
-                >
-                  Clear
-                </button>
+          {calibrationEnabled && (
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                gridTemplateColumns: "1fr",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                padding: 12,
+                background: "rgba(255,255,255,0.02)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Calibration</div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualCalibStep(0);
+                      setManualCalibOpen(true);
+                    }}
+                    disabled={exercise === "burpees"}
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      color: "#e6edf6",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      opacity: exercise === "burpees" ? 0.6 : 1,
+                    }}
+                  >
+                    Manual calibrate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCalibration((c) => ({
+                        ...c,
+                        [exercise]: undefined,
+                      }))
+                    }
+                    disabled={exercise === "burpees"}
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      color: "#e6edf6",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      opacity: exercise === "burpees" ? 0.6 : 1,
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-            </div>
-            {exercise === "burpees" ? (
-              <div style={{ fontSize: 12, color: "#a7b4c7" }}>Burpees don’t require calibration.</div>
-            ) : autoCalib.active ? (
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ fontSize: 12, color: "#d6ffe9" }}>Auto-calibrating…</div>
-                <div style={{ fontSize: 12, color: "#a7b4c7" }}>{autoCalibHint}</div>
-                <div
-                  style={{
-                    height: 8,
-                    borderRadius: 999,
-                    overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    background: "rgba(0,0,0,0.18)",
-                  }}
-                >
+              {exercise === "burpees" ? (
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Burpees don’t require calibration.</div>
+              ) : autoCalib.active ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 12, color: "#d6ffe9" }}>Auto-calibrating…</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>{autoCalibHint}</div>
                   <div
                     style={{
-                      height: "100%",
-                      width: `${Math.round((Math.min(900, autoCalib.stableMs) / 900) * 100)}%`,
-                      background: "rgba(60, 242, 176, 0.55)",
+                      height: 8,
+                      borderRadius: 999,
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      background: "rgba(0,0,0,0.18)",
                     }}
-                  />
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.round((Math.min(900, autoCalib.stableMs) / 900) * 100)}%`,
+                        background: "rgba(60, 242, 176, 0.55)",
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    Hold still for ~1 second. This runs automatically when calibration is missing.
+                  </div>
                 </div>
+              ) : (
                 <div style={{ fontSize: 12, color: "#a7b4c7" }}>
-                  Hold still for ~1 second. This runs automatically when calibration is missing.
+                  Calibrated. Use Manual calibrate if you want to refine it.
                 </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: "#a7b4c7" }}>
-                Calibrated. Use Manual calibrate if you want to refine it.
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {manualCalibOpen && (
             <div
@@ -2264,7 +2308,7 @@ export default function PoseRepCounter() {
           }}
         />
 
-        {autoCalib.active && (
+        {autoCalib.active && calibrationEnabled && (
           <div
             style={{
               position: "absolute",

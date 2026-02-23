@@ -27,6 +27,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .app__main {
+    animation: pageFadeIn 420ms ease-out both;
+  }
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -92,11 +109,16 @@ a {
   border-radius: 10px;
   border: 1px solid transparent;
   color: rgba(230, 237, 246, 0.9);
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .nav__link:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.nav__link:active {
+  transform: translateY(1px);
 }
 
 .nav__link--active {
@@ -197,10 +219,21 @@ a {
   background: rgba(255, 255, 255, 0.06);
   color: rgba(230, 237, 246, 0.96);
   font-weight: 700;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 
 .btn:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.btn:focus-visible,
+.nav__link:focus-visible {
+  outline: 2px solid rgba(60, 242, 176, 0.55);
+  outline-offset: 2px;
 }
 
 .btn--primary {
@@ -237,6 +270,15 @@ a {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   padding: 14px;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 .card__title {

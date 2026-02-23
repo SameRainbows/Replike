@@ -1,4 +1,5 @@
 import PoseRepCounter from "@/app/pose/PoseRepCounter";
+import Link from "next/link";
 
 export default function WorkoutPage() {
   return (
@@ -13,8 +14,11 @@ export default function WorkoutPage() {
       <div className="card stack">
         <div className="card__title">Setup</div>
         <div className="muted">
-          Place your device so your full body fits in frame. If tracking feels off, pause and
-          reposition, then recalibrate.
+          Place your device so your full body fits in frame. For best results, use good lighting and
+          keep the camera stable.
+        </div>
+        <div className="muted" style={{ fontSize: 13 }}>
+          Want tighter tracking? Enable calibration in <Link href="/settings">Settings</Link>.
         </div>
       </div>
 
