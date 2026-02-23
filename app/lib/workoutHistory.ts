@@ -3,13 +3,38 @@ export type WorkoutSession = {
   startedAt: number;
   endedAt: number;
   durationSec: number;
-  mode: "free" | "plan";
+  mode: "free" | "plan" | "custom";
   planId?: string;
   planName?: string;
+  customWorkout?: {
+    id: string;
+    name: string;
+    rounds: number;
+    steps: Array<
+      | { kind: "work_reps"; exercise: string; targetReps: number; label: string }
+      | { kind: "work_time"; exercise: string; workSec: number; label: string }
+      | { kind: "rest"; restSec: number; label: string }
+    >;
+  };
   goal?: {
     exercise: string;
     targetReps: number;
     reached: boolean;
+  };
+  quality?: {
+    clean: number;
+    ok: number;
+    sloppy: number;
+    avgRomPct?: number;
+    byExercise: Record<
+      string,
+      {
+        clean: number;
+        ok: number;
+        sloppy: number;
+        avgRomPct?: number;
+      }
+    >;
   };
   totalReps: number;
   totalRejects: number;

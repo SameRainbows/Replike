@@ -60,7 +60,11 @@ export default function HistoryPage() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
             <div style={{ display: "grid", gap: 4 }}>
               <div style={{ fontWeight: 800, letterSpacing: -0.2 }}>
-                {s.mode === "plan" ? s.planName ?? "Guided plan" : "Free workout"}
+                {s.mode === "plan"
+                  ? s.planName ?? "Guided plan"
+                  : s.mode === "custom"
+                    ? s.customWorkout?.name ?? "Custom workout"
+                    : "Free workout"}
               </div>
               <div className="muted" style={{ fontSize: 12 }}>
                 {new Date(s.endedAt).toLocaleString()}
@@ -77,6 +81,12 @@ export default function HistoryPage() {
               <div className="muted" style={{ fontSize: 13 }}>
                 Reps: {s.totalReps}
               </div>
+              {s.quality && (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Quality: {s.quality.clean} clean · {s.quality.ok} ok · {s.quality.sloppy} sloppy
+                  {typeof s.quality.avgRomPct === "number" ? ` · Avg ROM ${Math.round(s.quality.avgRomPct)}%` : ""}
+                </div>
+              )}
               {s.goal && (
                 <div className="muted" style={{ fontSize: 13 }}>
                   Goal: {s.goal.targetReps} {s.goal.exercise.replaceAll("_", " ")} — {s.goal.reached ? "Reached" : "Not reached"}

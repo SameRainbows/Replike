@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { appendSession, type WorkoutSession } from "@/app/lib/workoutHistory";
 import { loadSettings } from "@/app/lib/settings";
 import { playBeep } from "@/app/lib/sound";
+import { loadCustomWorkouts, type CustomWorkout } from "@/app/lib/customWorkouts";
 
 type ExerciseId =
   | "jumping_jacks"
@@ -42,6 +43,33 @@ type RepEvent = {
   kind: Exclude<DecisionKind, "none">;
   message: string;
   reps: number;
+};
+
+type TrackingHealth = {
+  level: "good" | "partial" | "lost";
+  fps: number;
+  hint: string;
+  missing: Array<"upper" | "lower" | "arms" | "head">;
+};
+
+type RepQualityLabel = "clean" | "ok" | "sloppy";
+
+type QualityAgg = {
+  clean: number;
+  ok: number;
+  sloppy: number;
+  romSum: number;
+  romCount: number;
+  byExercise: Record<
+    string,
+    {
+      clean: number;
+      ok: number;
+      sloppy: number;
+      romSum: number;
+      romCount: number;
+    }
+  >;
 };
 
 type JumpingJackCalibration = {
@@ -87,6 +115,12 @@ type WorkoutStep =
       label: string;
     }
   | {
+      kind: "work_time";
+      exercise: ExerciseId;
+      workSec: number;
+      label: string;
+    }
+  | {
       kind: "rest";
       restSec: number;
       label: string;
@@ -97,6 +131,11 @@ type WorkoutPlan = {
   name: string;
   steps: WorkoutStep[];
 };
+
+type CustomRunStep =
+  | { kind: "work_reps"; exercise: ExerciseId; targetReps: number; label: string }
+  | { kind: "work_time"; exercise: ExerciseId; workSec: number; label: string }
+  | { kind: "rest"; restSec: number; label: string };
 
 function randomId(prefix: string) {
   const rnd = Math.random().toString(16).slice(2);
@@ -150,6 +189,57 @@ function parsePctFromText(text: string) {
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n));
+}
+
+function parseAllPcts(text: string) {
+  const matches = text.match(/([0-9]{1,3})%/g) ?? [];
+  return matches
+    .map((t) => Number(t.replace("%", "")))
+    .filter((n) => Number.isFinite(n))
+    .map((n) => Math.max(0, Math.min(100, n)));
+}
+
+function romPctFromFeedback(exercise: ExerciseId, feedback: string) {
+  if (!feedback) return null;
+
+  if (exercise === "jumping_jacks") {
+    // "Open: 72% legs, 64% arms." -> average
+    const pcts = parseAllPcts(feedback);
+    if (pcts.length >= 2) return (pcts[0] + pcts[1]) / 2;
+    return pcts[0] ?? null;
+  }
+
+  if (exercise === "squats" || exercise === "jump_squats" || exercise === "lunges" || exercise === "high_knees") {
+    return parsePctFromText(feedback);
+  }
+
+  return null;
+}
+
+function classifyRep(exercise: ExerciseId, romPct: number | null, tempoMs: number) {
+  const minTempo =
+    exercise === "jumping_jacks"
+      ? 380
+      : exercise === "high_knees"
+        ? 300
+        : exercise === "jump_squats"
+          ? 520
+          : exercise === "lunges"
+            ? 750
+            : exercise === "squats"
+              ? 700
+              : 650;
+
+  if (tempoMs > 0 && tempoMs < minTempo) return "sloppy" satisfies RepQualityLabel;
+
+  if (romPct === null) return "ok" satisfies RepQualityLabel;
+  if (romPct >= 70) return "clean" satisfies RepQualityLabel;
+  if (romPct >= 50) return "ok" satisfies RepQualityLabel;
+  return "sloppy" satisfies RepQualityLabel;
+}
+
+function emptyAgg(): QualityAgg {
+  return { clean: 0, ok: 0, sloppy: 0, romSum: 0, romCount: 0, byExercise: {} };
 }
 
 function getCoachCue(exercise: ExerciseId, repState: RepState) {
@@ -216,6 +306,68 @@ function isLandmarkConfident(lm: NormalizedLandmark | null, minVis = 0.5) {
   if (!lm) return false;
   if (typeof lm.visibility !== "number") return true;
   return lm.visibility >= minVis;
+}
+
+function computeTrackingHealth(exercise: ExerciseId, landmarks: NormalizedLandmark[] | null, fps: number): TrackingHealth {
+  if (!landmarks || landmarks.length === 0) {
+    return {
+      level: "lost",
+      fps,
+      hint: "No pose detected. Step into frame.",
+      missing: ["upper", "lower"],
+    };
+  }
+
+  const lShoulder = getLandmark(landmarks, 11);
+  const rShoulder = getLandmark(landmarks, 12);
+  const lHip = getLandmark(landmarks, 23);
+  const rHip = getLandmark(landmarks, 24);
+  const lKnee = getLandmark(landmarks, 25);
+  const rKnee = getLandmark(landmarks, 26);
+  const lAnkle = getLandmark(landmarks, 27);
+  const rAnkle = getLandmark(landmarks, 28);
+  const lWrist = getLandmark(landmarks, 15);
+  const rWrist = getLandmark(landmarks, 16);
+  const nose = getLandmark(landmarks, 0);
+
+  const upperOk = isLandmarkConfident(lShoulder, 0.35) && isLandmarkConfident(rShoulder, 0.35) && isLandmarkConfident(lHip, 0.35) && isLandmarkConfident(rHip, 0.35);
+  const lowerOk = isLandmarkConfident(lKnee, 0.35) && isLandmarkConfident(rKnee, 0.35) && isLandmarkConfident(lAnkle, 0.25) && isLandmarkConfident(rAnkle, 0.25);
+
+  const armsOk =
+    exercise === "jumping_jacks" || exercise === "burpees"
+      ? isLandmarkConfident(lWrist, 0.25) && isLandmarkConfident(rWrist, 0.25)
+      : true;
+
+  const headOk =
+    exercise === "jumping_jacks"
+      ? isLandmarkConfident(nose, 0.25)
+      : true;
+
+  const missing: TrackingHealth["missing"] = [];
+  if (!upperOk) missing.push("upper");
+  if (!lowerOk) missing.push("lower");
+  if (!armsOk) missing.push("arms");
+  if (!headOk) missing.push("head");
+
+  if (missing.length === 0) {
+    return { level: "good", fps, hint: "Tracking looks good.", missing };
+  }
+
+  const hint =
+    missing.includes("lower")
+      ? "Show your full body (knees/ankles). Step back or tilt the camera down."
+      : missing.includes("upper")
+        ? "Show your full upper body (shoulders/hips). Step back or raise the camera."
+        : missing.includes("arms")
+          ? "Arms are hard to see. Improve lighting and keep wrists in frame."
+          : "Move into frame and improve lighting.";
+
+  return {
+    level: missing.length >= 2 ? "lost" : "partial",
+    fps,
+    hint,
+    missing,
+  };
 }
 
 function smoothLandmarks(
@@ -869,6 +1021,22 @@ export default function PoseRepCounter() {
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState<boolean>(false);
+  const [trackingHealth, setTrackingHealth] = useState<TrackingHealth>(() => ({
+    level: "lost",
+    fps: 0,
+    hint: "No pose detected. Step into frame.",
+    missing: ["upper", "lower"],
+  }));
+
+  const lastFrameMsRef = useRef<number>(0);
+
+  const qualityAggRef = useRef<QualityAgg>(emptyAgg());
+  const lastCountedRepTsRef = useRef<number>(0);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [lastSummary, setLastSummary] = useState<WorkoutSession["quality"] | null>(null);
+
   useEffect(() => {
     const read = () => {
       const s = loadSettings();
@@ -897,6 +1065,18 @@ export default function PoseRepCounter() {
       window.removeEventListener("repdetect:settings", read);
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("repdetect:setupDismissed:v1");
+      setSetupDismissed(raw === "1");
+    } catch {
+      setSetupDismissed(false);
+    }
+  }, []);
+
+  const [customWorkouts, setCustomWorkouts] = useState<CustomWorkout[]>([]);
+  const [selectedCustomWorkoutId, setSelectedCustomWorkoutId] = useState<string>("");
 
   useEffect(() => {
     goalReachedRef.current = goalReached;
@@ -956,7 +1136,7 @@ export default function PoseRepCounter() {
     return plans;
   }, []);
 
-  const [planMode, setPlanMode] = useState<"free" | "plan">("free");
+  const [planMode, setPlanMode] = useState<"free" | "plan" | "custom">("free");
   const [selectedPlanId, setSelectedPlanId] = useState<string>("starter_cardio");
   const [planState, setPlanState] = useState<{
     active: boolean;
@@ -965,6 +1145,14 @@ export default function PoseRepCounter() {
     stepStartedAt: number;
     stepStartReps: number;
   }>(() => ({ active: false, planId: "starter_cardio", stepIndex: 0, stepStartedAt: 0, stepStartReps: 0 }));
+  const [customState, setCustomState] = useState<{
+    active: boolean;
+    workoutId: string;
+    roundIndex: number;
+    stepIndex: number;
+    stepStartedAt: number;
+    stepStartReps: number;
+  }>(() => ({ active: false, workoutId: "", roundIndex: 0, stepIndex: 0, stepStartedAt: 0, stepStartReps: 0 }));
   const [planNowMs, setPlanNowMs] = useState<number>(0);
 
   const sessionRef = useRef<{
@@ -977,6 +1165,7 @@ export default function PoseRepCounter() {
   const coachCue = useMemo(() => getCoachCue(exercise, repState), [exercise, repState.feedback, repState.phase]);
 
   const planRunRef = useRef<{ startedAt: number } | null>(null);
+  const customRunRef = useRef<{ startedAt: number } | null>(null);
 
   function showToast(message: string) {
     setToast(message);
@@ -993,16 +1182,43 @@ export default function PoseRepCounter() {
       repsByExercise: {},
       totalRejects: 0,
     };
+    qualityAggRef.current = emptyAgg();
+    lastCountedRepTsRef.current = 0;
     setGoalReached(false);
     goalReachedRef.current = false;
   }
 
-  function saveSession(mode: "free" | "plan", plan?: { id: string; name: string }) {
+  function saveSession(mode: WorkoutSession["mode"], meta?: { id: string; name: string }) {
     const startedAt =
-      mode === "plan" ? planRunRef.current?.startedAt ?? Date.now() : sessionRef.current.startedAt;
+      mode === "plan"
+        ? planRunRef.current?.startedAt ?? Date.now()
+        : mode === "custom"
+          ? customRunRef.current?.startedAt ?? Date.now()
+          : sessionRef.current.startedAt;
     const endedAt = Date.now();
     const repsByExercise = sessionRef.current.repsByExercise;
     const totalReps = Object.values(repsByExercise).reduce((a, b) => a + b, 0);
+
+    const cw =
+      mode === "custom" ? customWorkouts.find((w) => w.id === (meta?.id ?? selectedCustomWorkoutId)) ?? null : null;
+
+    const agg = qualityAggRef.current;
+    const byExercise: NonNullable<WorkoutSession["quality"]>["byExercise"] = {};
+    for (const [ex, a] of Object.entries(agg.byExercise)) {
+      byExercise[ex] = {
+        clean: a.clean,
+        ok: a.ok,
+        sloppy: a.sloppy,
+        avgRomPct: a.romCount > 0 ? a.romSum / a.romCount : undefined,
+      };
+    }
+    const quality: WorkoutSession["quality"] = {
+      clean: agg.clean,
+      ok: agg.ok,
+      sloppy: agg.sloppy,
+      avgRomPct: agg.romCount > 0 ? agg.romSum / agg.romCount : undefined,
+      byExercise,
+    };
 
     const next: WorkoutSession = {
       id: randomId("sess"),
@@ -1010,8 +1226,17 @@ export default function PoseRepCounter() {
       endedAt,
       durationSec: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
       mode,
-      planId: plan?.id,
-      planName: plan?.name,
+      planId: mode === "plan" ? meta?.id : undefined,
+      planName: mode === "plan" ? meta?.name : undefined,
+      customWorkout:
+        mode === "custom" && cw
+          ? {
+              id: cw.id,
+              name: cw.name,
+              rounds: cw.rounds,
+              steps: cw.steps,
+            }
+          : undefined,
       goal:
         mode === "free" && activeFreeGoal
           ? {
@@ -1020,16 +1245,21 @@ export default function PoseRepCounter() {
               reached: goalReachedRef.current || repState.repCount >= activeFreeGoal,
             }
           : undefined,
+      quality,
       totalReps,
       totalRejects: sessionRef.current.totalRejects,
       repsByExercise,
     };
 
     appendSession(next);
-    showToast(mode === "plan" ? "Saved to History" : "Session saved");
+    showToast(mode === "plan" || mode === "custom" ? "Saved to History" : "Session saved");
+
+    setLastSummary(next.quality ?? null);
+    setSummaryOpen(true);
 
     if (mode === "free") resetFreeSession();
     if (mode === "plan") planRunRef.current = null;
+    if (mode === "custom") customRunRef.current = null;
   }
 
   const calibSteps = useMemo(() => {
@@ -1296,14 +1526,16 @@ export default function PoseRepCounter() {
       const parsed = JSON.parse(raw) as {
         exercise?: ExerciseId;
         calibration?: Calibration;
-        planMode?: "free" | "plan";
+        planMode?: "free" | "plan" | "custom";
         selectedPlanId?: string;
+        selectedCustomWorkoutId?: string;
       };
 
       if (parsed.exercise) setExercise(parsed.exercise);
       if (parsed.calibration) setCalibration(parsed.calibration);
       if (parsed.planMode) setPlanMode(parsed.planMode);
       if (parsed.selectedPlanId) setSelectedPlanId(parsed.selectedPlanId);
+      if (parsed.selectedCustomWorkoutId) setSelectedCustomWorkoutId(parsed.selectedCustomWorkoutId);
     } catch {
       // ignore
     }
@@ -1318,12 +1550,40 @@ export default function PoseRepCounter() {
           calibration,
           planMode,
           selectedPlanId,
+          selectedCustomWorkoutId,
         })
       );
     } catch {
       // ignore
     }
-  }, [exercise, calibration, planMode, selectedPlanId]);
+  }, [exercise, calibration, planMode, selectedPlanId, selectedCustomWorkoutId]);
+
+  useEffect(() => {
+    setCustomWorkouts(loadCustomWorkouts());
+
+    const onChange = () => setCustomWorkouts(loadCustomWorkouts());
+    window.addEventListener("storage", onChange);
+    window.addEventListener("repdetect:customWorkouts", onChange);
+    return () => {
+      window.removeEventListener("storage", onChange);
+      window.removeEventListener("repdetect:customWorkouts", onChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("repdetect:runCustomWorkout:v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { workoutId?: string };
+      if (parsed.workoutId) {
+        setPlanMode("custom");
+        setSelectedCustomWorkoutId(parsed.workoutId);
+      }
+      localStorage.removeItem("repdetect:runCustomWorkout:v1");
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     exerciseRef.current = exercise;
@@ -1365,6 +1625,28 @@ export default function PoseRepCounter() {
       const ex = exerciseRef.current;
       sessionRef.current.repsByExercise[ex] = (sessionRef.current.repsByExercise[ex] ?? 0) + 1;
       if (soundOnRepRef.current) playBeep("rep");
+
+      const nowTs = Date.now();
+      const tempoMs = lastCountedRepTsRef.current ? nowTs - lastCountedRepTsRef.current : 0;
+      lastCountedRepTsRef.current = nowTs;
+
+      const romPct = romPctFromFeedback(ex, repState.feedback);
+      const label = classifyRep(ex, romPct, tempoMs);
+
+      const agg = qualityAggRef.current;
+      agg[label] += 1;
+
+      if (typeof romPct === "number") {
+        agg.romSum += romPct;
+        agg.romCount += 1;
+      }
+
+      const exAgg = (agg.byExercise[ex] ??= { clean: 0, ok: 0, sloppy: 0, romSum: 0, romCount: 0 });
+      exAgg[label] += 1;
+      if (typeof romPct === "number") {
+        exAgg.romSum += romPct;
+        exAgg.romCount += 1;
+      }
     }
     if (repState.decisionKind === "reject") {
       sessionRef.current.totalRejects += 1;
@@ -1414,12 +1696,23 @@ export default function PoseRepCounter() {
     return plan.steps[planState.stepIndex] ?? null;
   }, [planState, workoutPlans]);
 
+  const activeCustomWorkout = useMemo(() => {
+    return customWorkouts.find((w) => w.id === selectedCustomWorkoutId) ?? null;
+  }, [customWorkouts, selectedCustomWorkoutId]);
+
+  const activeCustomStep = useMemo<CustomRunStep | null>(() => {
+    if (!customState.active) return null;
+    const w = customWorkouts.find((x) => x.id === customState.workoutId);
+    if (!w) return null;
+    return (w.steps[customState.stepIndex] as CustomRunStep | undefined) ?? null;
+  }, [customState, customWorkouts]);
+
   useEffect(() => {
-    if (!planState.active) return;
+    if (!planState.active && !customState.active) return;
     setPlanNowMs(Date.now());
     const id = window.setInterval(() => setPlanNowMs(Date.now()), 200);
     return () => window.clearInterval(id);
-  }, [planState.active]);
+  }, [planState.active, customState.active]);
 
   useEffect(() => {
     if (!planState.active) return;
@@ -1464,6 +1757,113 @@ export default function PoseRepCounter() {
       }
     }
   }, [planState.active, planState.stepIndex, planState.stepStartReps, planState.stepStartedAt, planNowMs, repState.repCount, activePlanStep, activePlan, exercise]);
+
+  useEffect(() => {
+    if (!customState.active) return;
+    const w = customWorkouts.find((x) => x.id === customState.workoutId);
+    if (!w) return;
+    const step = w.steps[customState.stepIndex] as CustomRunStep | undefined;
+    if (!step) return;
+
+    if (step.kind === "work_reps") {
+      if (exercise !== step.exercise) setExercise(step.exercise);
+
+      const repsDone = repState.repCount - customState.stepStartReps;
+      if (repsDone >= step.targetReps) {
+        const nextIndex = customState.stepIndex + 1;
+        if (nextIndex >= w.steps.length) {
+          const nextRound = customState.roundIndex + 1;
+          if (nextRound >= Math.max(1, w.rounds)) {
+            showToast("Workout complete");
+            saveSession("custom", { id: w.id, name: w.name });
+            setCustomState((s) => ({ ...s, active: false }));
+            return;
+          }
+
+          setCustomState((s) => ({
+            ...s,
+            roundIndex: nextRound,
+            stepIndex: 0,
+            stepStartedAt: Date.now(),
+            stepStartReps: repState.repCount,
+          }));
+          return;
+        }
+
+        setCustomState((s) => ({
+          ...s,
+          stepIndex: nextIndex,
+          stepStartedAt: Date.now(),
+          stepStartReps: repState.repCount,
+        }));
+      }
+    }
+
+    if (step.kind === "work_time") {
+      if (exercise !== step.exercise) setExercise(step.exercise);
+      const elapsedSec = (planNowMs - customState.stepStartedAt) / 1000;
+      if (elapsedSec >= step.workSec) {
+        const nextIndex = customState.stepIndex + 1;
+        if (nextIndex >= w.steps.length) {
+          const nextRound = customState.roundIndex + 1;
+          if (nextRound >= Math.max(1, w.rounds)) {
+            showToast("Workout complete");
+            saveSession("custom", { id: w.id, name: w.name });
+            setCustomState((s) => ({ ...s, active: false }));
+            return;
+          }
+
+          setCustomState((s) => ({
+            ...s,
+            roundIndex: nextRound,
+            stepIndex: 0,
+            stepStartedAt: Date.now(),
+            stepStartReps: repState.repCount,
+          }));
+          return;
+        }
+
+        setCustomState((s) => ({
+          ...s,
+          stepIndex: nextIndex,
+          stepStartedAt: Date.now(),
+          stepStartReps: repState.repCount,
+        }));
+      }
+    }
+
+    if (step.kind === "rest") {
+      const elapsedSec = (planNowMs - customState.stepStartedAt) / 1000;
+      if (elapsedSec >= step.restSec) {
+        const nextIndex = customState.stepIndex + 1;
+        if (nextIndex >= w.steps.length) {
+          const nextRound = customState.roundIndex + 1;
+          if (nextRound >= Math.max(1, w.rounds)) {
+            showToast("Workout complete");
+            saveSession("custom", { id: w.id, name: w.name });
+            setCustomState((s) => ({ ...s, active: false }));
+            return;
+          }
+
+          setCustomState((s) => ({
+            ...s,
+            roundIndex: nextRound,
+            stepIndex: 0,
+            stepStartedAt: Date.now(),
+            stepStartReps: repState.repCount,
+          }));
+          return;
+        }
+
+        setCustomState((s) => ({
+          ...s,
+          stepIndex: nextIndex,
+          stepStartedAt: Date.now(),
+          stepStartReps: repState.repCount,
+        }));
+      }
+    }
+  }, [customState.active, customState.stepIndex, customState.roundIndex, customState.stepStartedAt, customState.stepStartReps, planNowMs, repState.repCount, customWorkouts, exercise]);
 
   function isPoseStableForAutoCalibration(
     landmarks: NormalizedLandmark[],
@@ -1632,6 +2032,9 @@ export default function PoseRepCounter() {
           }
 
           const nowMs = performance.now();
+          const dt = lastFrameMsRef.current ? nowMs - lastFrameMsRef.current : 0;
+          lastFrameMsRef.current = nowMs;
+          const fps = dt > 0 ? Math.min(120, Math.max(0, 1000 / dt)) : 0;
 
           if (videoEl.currentTime === lastVideoTime) return;
           lastVideoTime = videoEl.currentTime;
@@ -1645,6 +2048,8 @@ export default function PoseRepCounter() {
             const smoothed = smoothLandmarks(smoothedRef.current, raw, 0.25);
             smoothedRef.current = smoothed;
             lastLandmarksRef.current = smoothed;
+
+            setTrackingHealth(computeTrackingHealth(exerciseRef.current, smoothed, fps));
 
             // Hands-free calibration: when missing calibration, wait for stable poses and capture automatically.
             if (autoCalib.active && calibrationEnabledRef.current) {
@@ -1733,6 +2138,7 @@ export default function PoseRepCounter() {
               return prev;
             });
           } else {
+            setTrackingHealth(computeTrackingHealth(exerciseRef.current, null, fps));
             setRepState((prev) => ({
               ...prev,
               phase: "unknown",
@@ -1812,7 +2218,7 @@ export default function PoseRepCounter() {
               <select
                 value={exercise}
                 onChange={(e) => setExercise(e.target.value as ExerciseId)}
-                disabled={planState.active}
+                disabled={planState.active || customState.active}
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   color: "#e6edf6",
@@ -1821,7 +2227,7 @@ export default function PoseRepCounter() {
                   padding: "10px 12px",
                   fontSize: 14,
                   outline: "none",
-                  opacity: planState.active ? 0.7 : 1,
+                  opacity: planState.active || customState.active ? 0.7 : 1,
                 }}
               >
                 <option value="jumping_jacks">Jumping jacks</option>
@@ -1832,6 +2238,35 @@ export default function PoseRepCounter() {
                 <option value="burpees">Burpees</option>
               </select>
             </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,0.10)",
+                background:
+                  trackingHealth.level === "good"
+                    ? "rgba(60, 242, 176, 0.10)"
+                    : trackingHealth.level === "partial"
+                      ? "rgba(255, 214, 102, 0.10)"
+                      : "rgba(255, 80, 80, 0.10)",
+                color: "rgba(230, 237, 246, 0.92)",
+                fontSize: 12,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontWeight: 800 }}>
+                {trackingHealth.level === "good" ? "Tracking: good" : trackingHealth.level === "partial" ? "Tracking: partial" : "Tracking: lost"}
+              </span>
+              <span className="muted">{`${Math.round(trackingHealth.fps)} fps`}</span>
+            </div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {trackingHealth.hint}
+            </div>
+          </div>
 
             {planMode === "free" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
@@ -1872,11 +2307,14 @@ export default function PoseRepCounter() {
               <select
                 value={planMode}
                 onChange={(e) => {
-                  const v = e.target.value as "free" | "plan";
+                  const v = e.target.value as "free" | "plan" | "custom";
                   setPlanMode(v);
-                  if (v === "free") setPlanState((s) => ({ ...s, active: false }));
+                  if (v === "free") {
+                    setPlanState((s) => ({ ...s, active: false }));
+                    setCustomState((s) => ({ ...s, active: false }));
+                  }
                 }}
-                disabled={planState.active}
+                disabled={planState.active || customState.active}
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   color: "#e6edf6",
@@ -1885,11 +2323,12 @@ export default function PoseRepCounter() {
                   padding: "10px 12px",
                   fontSize: 14,
                   outline: "none",
-                  opacity: planState.active ? 0.7 : 1,
+                  opacity: planState.active || customState.active ? 0.7 : 1,
                 }}
               >
                 <option value="free">Free workout</option>
                 <option value="plan">Guided plan</option>
+                <option value="custom">Custom workout</option>
               </select>
             </div>
 
@@ -1920,6 +2359,37 @@ export default function PoseRepCounter() {
               </div>
             )}
 
+            {planMode === "custom" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 260 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Workout</div>
+                <select
+                  value={selectedCustomWorkoutId}
+                  onChange={(e) => setSelectedCustomWorkoutId(e.target.value)}
+                  disabled={customState.active}
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e6edf6",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    outline: "none",
+                    opacity: customState.active ? 0.7 : 1,
+                  }}
+                >
+                  <option value="">Select a workout…</option>
+                  {customWorkouts.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  Build workouts in <a href="/builder">Builder</a>.
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setSessionRunning((s) => !s)}
@@ -1935,6 +2405,23 @@ export default function PoseRepCounter() {
               }}
             >
               {sessionRunning ? "Pause" : "Resume"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSetupOpen(true)}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                color: "#e6edf6",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 14,
+                cursor: "pointer",
+                alignSelf: "end",
+              }}
+            >
+              Setup
             </button>
 
             {planMode === "plan" && (
@@ -1974,6 +2461,52 @@ export default function PoseRepCounter() {
                 }}
               >
                 {planState.active ? "Stop plan" : "Start plan"}
+              </button>
+            )}
+
+            {planMode === "custom" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (customState.active) {
+                    setCustomState((s) => ({ ...s, active: false }));
+                    showToast("Workout stopped");
+                    customRunRef.current = null;
+                    return;
+                  }
+
+                  if (!activeCustomWorkout) {
+                    showToast("Select a custom workout");
+                    return;
+                  }
+
+                  customRunRef.current = { startedAt: Date.now() };
+                  resetFreeSession();
+                  setCustomState({
+                    active: true,
+                    workoutId: activeCustomWorkout.id,
+                    roundIndex: 0,
+                    stepIndex: 0,
+                    stepStartedAt: Date.now(),
+                    stepStartReps: repState.repCount,
+                  });
+                  showToast("Workout started");
+                }}
+                style={{
+                  background: customState.active ? "rgba(255, 80, 80, 0.12)" : "rgba(60, 242, 176, 0.14)",
+                  color: "#e6edf6",
+                  border: customState.active
+                    ? "1px solid rgba(255, 80, 80, 0.28)"
+                    : "1px solid rgba(60, 242, 176, 0.35)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  alignSelf: "end",
+                  fontWeight: 800,
+                }}
+              >
+                {customState.active ? "Stop workout" : "Start workout"}
               </button>
             )}
 
@@ -2086,11 +2619,67 @@ export default function PoseRepCounter() {
                     </div>
                   )}
                 </div>
+              ) : activePlanStep.kind === "work_time" ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{`${activePlanStep.label}: ${activePlanStep.workSec}s`}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Time left: ${Math.max(0, Math.ceil(activePlanStep.workSec - (planNowMs - planState.stepStartedAt) / 1000))}s`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Reps this step: ${Math.max(0, repState.repCount - planState.stepStartReps)}`}
+                  </div>
+                </div>
               ) : (
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontWeight: 800 }}>{activePlanStep.label}</div>
                   <div style={{ fontSize: 12, color: "#a7b4c7" }}>
                     {`Time left: ${Math.max(0, Math.ceil(activePlanStep.restSec - (planNowMs - planState.stepStartedAt) / 1000))}s`}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {customState.active && activeCustomWorkout && activeCustomStep && (
+            <div
+              style={{
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                padding: 12,
+                background: "rgba(255,255,255,0.02)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Custom workout</div>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                  {`Round ${customState.roundIndex + 1}/${Math.max(1, activeCustomWorkout.rounds)} · Step ${customState.stepIndex + 1}/${activeCustomWorkout.steps.length}`}
+                </div>
+              </div>
+
+              {activeCustomStep.kind === "work_reps" ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{`${activeCustomStep.label}: ${activeCustomStep.targetReps} reps`}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Progress: ${Math.max(0, repState.repCount - customState.stepStartReps)}/${activeCustomStep.targetReps}`}
+                  </div>
+                </div>
+              ) : activeCustomStep.kind === "work_time" ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{`${activeCustomStep.label}: ${activeCustomStep.workSec}s`}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Time left: ${Math.max(0, Math.ceil(activeCustomStep.workSec - (planNowMs - customState.stepStartedAt) / 1000))}s`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Reps this step: ${Math.max(0, repState.repCount - customState.stepStartReps)}`}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{activeCustomStep.label}</div>
+                  <div style={{ fontSize: 12, color: "#a7b4c7" }}>
+                    {`Time left: ${Math.max(0, Math.ceil(activeCustomStep.restSec - (planNowMs - customState.stepStartedAt) / 1000))}s`}
                   </div>
                 </div>
               )}
@@ -2363,6 +2952,142 @@ export default function PoseRepCounter() {
           <div style={{ fontSize: 12, color: "#a7b4c7" }}>Status: {status}</div>
         </div>
       </div>
+
+      {!setupDismissed && status === "running" && trackingHealth.level !== "good" && (
+        <div className="card" style={{ padding: 12, background: "rgba(255,255,255,0.02)" }}>
+          <div className="card__title">Quick setup tip</div>
+          <div className="muted" style={{ fontSize: 13 }}>
+            {trackingHealth.hint}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <button type="button" className="btn btn--primary" onClick={() => setSetupOpen(true)}>
+              Open setup
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setSetupDismissed(true);
+                try {
+                  localStorage.setItem("repdetect:setupDismissed:v1", "1");
+                } catch {
+                  // ignore
+                }
+              }}
+            >
+              Don’t show again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {summaryOpen && lastSummary && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="modalBackdrop"
+          onClick={() => setSummaryOpen(false)}
+        >
+          <div className="modalCard" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+              <div style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Session summary</div>
+                <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.2 }}>Rep quality</div>
+              </div>
+              <button type="button" className="btn" onClick={() => setSummaryOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className="surface--inset" style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>Totals</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {`${lastSummary.clean} clean · ${lastSummary.ok} ok · ${lastSummary.sloppy} sloppy`}
+                {typeof lastSummary.avgRomPct === "number" ? ` · Avg ROM ${Math.round(lastSummary.avgRomPct)}%` : ""}
+              </div>
+            </div>
+
+            <div className="surface--inset" style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>By exercise</div>
+              {Object.keys(lastSummary.byExercise || {}).length === 0 ? (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  No quality data recorded.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {Object.entries(lastSummary.byExercise)
+                    .sort((a, b) => (b[1].clean + b[1].ok + b[1].sloppy) - (a[1].clean + a[1].ok + a[1].sloppy))
+                    .map(([ex, q]) => (
+                      <div
+                        key={ex}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          alignItems: "baseline",
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: 13 }}>{ex.replaceAll("_", " ")}</div>
+                        <div className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+                          {`${q.clean} clean · ${q.ok} ok · ${q.sloppy} sloppy`}
+                          {typeof q.avgRomPct === "number" ? ` · Avg ROM ${Math.round(q.avgRomPct)}%` : ""}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {setupOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="modalBackdrop"
+          onClick={() => setSetupOpen(false)}
+        >
+          <div className="modalCard" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+              <div style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Setup wizard</div>
+                <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.2 }}>Make tracking rock solid</div>
+              </div>
+              <button type="button" className="btn" onClick={() => setSetupOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className="surface--inset" style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>Live status</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {trackingHealth.level === "good"
+                  ? "Tracking looks good. You’re ready to go."
+                  : trackingHealth.level === "partial"
+                    ? "Tracking is partial — the model is losing some landmarks."
+                    : "Tracking is lost — the model can’t see a stable pose."}
+              </div>
+              <div className="muted" style={{ fontSize: 12 }}>{`FPS: ${Math.round(trackingHealth.fps)}`}</div>
+            </div>
+
+            <div className="surface--inset" style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>Checklist</div>
+              <div className="muted" style={{ fontSize: 13 }}>Do these in order for the fastest fix:</div>
+              <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                <div style={{ color: "rgba(230, 237, 246, 0.92)" }}>1) Step back until your full body is visible</div>
+                <div style={{ color: "rgba(230, 237, 246, 0.92)" }}>2) Improve lighting (face the light, avoid backlight)</div>
+                <div style={{ color: "rgba(230, 237, 246, 0.92)" }}>3) Keep the camera stable (no wobble)</div>
+              </div>
+            </div>
+
+            <div className="surface--inset" style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>What to fix right now</div>
+              <div className="muted" style={{ fontSize: 13 }}>{trackingHealth.hint}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {status === "error" && (
         <div

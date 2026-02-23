@@ -9,7 +9,7 @@ https://replike.vercel.app/
 ## What it does
 
 Replike uses your device camera and an on-device pose model to track body landmarks, guide calibration, and count reps for multiple exercises.
-It also supports guided workout plans and stores workout history locally in your browser.
+It supports free workouts, guided plans, and custom workouts you can build yourself. Sessions are stored locally in your browser.
 
 ## Key features
 
@@ -19,9 +19,18 @@ It also supports guided workout plans and stores workout history locally in your
   Includes jumping jacks, squats, lunges, high knees, jump squats, and burpees.
 - **Guided workout plans**
   Preset plans with work/rest steps, timers, and step-by-step progression.
+- **Custom Workout Builder**
+  Create your own workouts (rounds + steps) with reps, timed intervals, and rest.
+- **Rep quality scoring + session summary**
+  Each counted rep is classified as clean/ok/sloppy using range-of-motion and tempo heuristics.
+  A session summary appears after saving or completing a workout.
+- **Tracking health + setup wizard**
+  Live tracking status (good/partial/lost) with FPS and actionable tips. Includes a Setup wizard modal.
 - **Workout history**
-  Completed plan sessions are auto-saved; free workouts can be saved manually.
+  Completed plan/custom sessions are auto-saved; free workouts can be saved manually.
   Sessions are stored in `localStorage`.
+- **Goals + sound cues**
+  Optional rep goals for free workouts (beep when you reach the goal) and optional beeps on each counted rep.
 - **In-video overlays**
   Landmarks and prompts are rendered to a canvas overlay aligned to the displayed video.
 
@@ -33,7 +42,9 @@ It also supports guided workout plans and stores workout history locally in your
 4. Choose:
    - **Free workout** to pick an exercise and count reps.
    - **Guided plan** to run a preset plan.
+   - **Custom workout** to run a workout you built in the **Builder**.
 5. View saved sessions under **History**.
+6. (Optional) Use **Settings** to enable calibration and configure sound cues.
 
 ## Tech stack
 
