@@ -77,6 +77,11 @@ export default function HistoryPage() {
               <div className="muted" style={{ fontSize: 13 }}>
                 Reps: {s.totalReps}
               </div>
+              {s.goal && (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Goal: {s.goal.targetReps} {s.goal.exercise.replaceAll("_", " ")} — {s.goal.reached ? "Reached" : "Not reached"}
+                </div>
+              )}
               <div className="muted" style={{ fontSize: 13 }}>
                 Rejected: {s.totalRejects}
               </div>

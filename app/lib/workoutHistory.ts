@@ -6,6 +6,11 @@ export type WorkoutSession = {
   mode: "free" | "plan";
   planId?: string;
   planName?: string;
+  goal?: {
+    exercise: string;
+    targetReps: number;
+    reached: boolean;
+  };
   totalReps: number;
   totalRejects: number;
   repsByExercise: Record<string, number>;

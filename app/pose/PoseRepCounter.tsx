@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appendSession, type WorkoutSession } from "@/app/lib/workoutHistory";
 import { loadSettings } from "@/app/lib/settings";
+import { playBeep } from "@/app/lib/sound";
 
 type ExerciseId =
   | "jumping_jacks"
@@ -141,6 +142,38 @@ function formatUnknownError(e: unknown) {
 
 function clamp01(x: number) {
   return Math.min(1, Math.max(0, x));
+}
+
+function parsePctFromText(text: string) {
+  const m = /([0-9]{1,3})%/.exec(text);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, n));
+}
+
+function getCoachCue(exercise: ExerciseId, repState: RepState) {
+  if (!repState.feedback) return "";
+
+  if (exercise === "squats") {
+    const pct = parsePctFromText(repState.feedback);
+    if (pct === null) return "";
+    if (pct < 35) return "Coach: Go a bit deeper (controlled).";
+    if (pct < 55) return "Coach: Nice. Try a little more depth.";
+    if (repState.phase === "down") return "Coach: Drive up — stand tall at the top.";
+    return "Coach: Smooth tempo — stay balanced.";
+  }
+
+  if (exercise === "jumping_jacks") {
+    const nums = repState.feedback.match(/([0-9]{1,3})%/g)?.map((t) => Number(t.replace("%", ""))) ?? [];
+    const legs = Number.isFinite(nums[0]) ? nums[0] : null;
+    const arms = Number.isFinite(nums[1]) ? nums[1] : null;
+    if (legs !== null && legs < 55) return "Coach: Wider feet.";
+    if (arms !== null && arms < 55) return "Coach: Reach higher with your arms.";
+    return "Coach: Great rhythm — keep it steady.";
+  }
+
+  return "";
 }
 
 function newId() {
@@ -813,6 +846,13 @@ export default function PoseRepCounter() {
   const [calibrationEnabled, setCalibrationEnabled] = useState<boolean>(false);
   const calibrationEnabledRef = useRef<boolean>(false);
 
+  const soundOnRepRef = useRef<boolean>(true);
+  const soundOnGoalRef = useRef<boolean>(true);
+
+  const [freeGoalByExercise, setFreeGoalByExercise] = useState<Record<string, number | null>>({});
+  const [goalReached, setGoalReached] = useState<boolean>(false);
+  const goalReachedRef = useRef<boolean>(false);
+
   const exerciseRef = useRef<ExerciseId>(exercise);
   const sessionRunningRef = useRef<boolean>(sessionRunning);
   const calibrationRef = useRef<Calibration>(calibration);
@@ -831,9 +871,12 @@ export default function PoseRepCounter() {
 
   useEffect(() => {
     const read = () => {
-      const enabled = loadSettings().calibrationEnabled;
+      const s = loadSettings();
+      const enabled = s.calibrationEnabled;
       setCalibrationEnabled(enabled);
       calibrationEnabledRef.current = enabled;
+      soundOnRepRef.current = s.soundOnRep;
+      soundOnGoalRef.current = s.soundOnGoal;
 
       if (!enabled) {
         setManualCalibOpen(false);
@@ -854,6 +897,10 @@ export default function PoseRepCounter() {
       window.removeEventListener("repdetect:settings", read);
     };
   }, []);
+
+  useEffect(() => {
+    goalReachedRef.current = goalReached;
+  }, [goalReached]);
 
   const [repState, setRepState] = useState<RepState>(() => ({
     exercise: "squats",
@@ -926,6 +973,9 @@ export default function PoseRepCounter() {
     totalRejects: number;
   }>({ startedAt: Date.now(), repsByExercise: {}, totalRejects: 0 });
 
+  const activeFreeGoal = planMode === "free" ? (freeGoalByExercise[exercise] ?? null) : null;
+  const coachCue = useMemo(() => getCoachCue(exercise, repState), [exercise, repState.feedback, repState.phase]);
+
   const planRunRef = useRef<{ startedAt: number } | null>(null);
 
   function showToast(message: string) {
@@ -943,6 +993,8 @@ export default function PoseRepCounter() {
       repsByExercise: {},
       totalRejects: 0,
     };
+    setGoalReached(false);
+    goalReachedRef.current = false;
   }
 
   function saveSession(mode: "free" | "plan", plan?: { id: string; name: string }) {
@@ -960,6 +1012,14 @@ export default function PoseRepCounter() {
       mode,
       planId: plan?.id,
       planName: plan?.name,
+      goal:
+        mode === "free" && activeFreeGoal
+          ? {
+              exercise,
+              targetReps: activeFreeGoal,
+              reached: goalReachedRef.current || repState.repCount >= activeFreeGoal,
+            }
+          : undefined,
       totalReps,
       totalRejects: sessionRef.current.totalRejects,
       repsByExercise,
@@ -1293,6 +1353,8 @@ export default function PoseRepCounter() {
       decisionMessage: "",
     }));
     setEvents([]);
+    setGoalReached(false);
+    goalReachedRef.current = false;
   }, [exercise]);
 
   useEffect(() => {
@@ -1302,6 +1364,7 @@ export default function PoseRepCounter() {
     if (repState.decisionKind === "rep") {
       const ex = exerciseRef.current;
       sessionRef.current.repsByExercise[ex] = (sessionRef.current.repsByExercise[ex] ?? 0) + 1;
+      if (soundOnRepRef.current) playBeep("rep");
     }
     if (repState.decisionKind === "reject") {
       sessionRef.current.totalRejects += 1;
@@ -1329,6 +1392,19 @@ export default function PoseRepCounter() {
       return merged.slice(0, 20);
     });
   }, [repState.decisionId]);
+
+  useEffect(() => {
+    if (planMode !== "free") return;
+    if (!activeFreeGoal) return;
+    if (goalReachedRef.current) return;
+
+    if (repState.repCount >= activeFreeGoal) {
+      setGoalReached(true);
+      goalReachedRef.current = true;
+      showToast("Goal reached");
+      if (soundOnGoalRef.current) playBeep("goal");
+    }
+  }, [planMode, activeFreeGoal, repState.repCount]);
 
   const activePlan = useMemo(() => workoutPlans.find((p) => p.id === selectedPlanId) ?? workoutPlans[0], [selectedPlanId, workoutPlans]);
   const activePlanStep = useMemo(() => {
@@ -1757,6 +1833,40 @@ export default function PoseRepCounter() {
               </select>
             </div>
 
+            {planMode === "free" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
+                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Goal (optional)</div>
+                <input
+                  inputMode="numeric"
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 75"
+                  value={activeFreeGoal ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const next = raw === "" ? null : Math.max(1, Math.floor(Number(raw)));
+                    setFreeGoalByExercise((prev) => ({ ...prev, [exercise]: Number.isFinite(next as number) ? next : null }));
+                    setGoalReached(false);
+                    goalReachedRef.current = false;
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e6edf6",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    outline: "none",
+                  }}
+                />
+                {activeFreeGoal && (
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {goalReached ? `Reached: ${repState.repCount}/${activeFreeGoal}` : `Progress: ${repState.repCount}/${activeFreeGoal}`}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
               <div style={{ fontSize: 12, color: "#a7b4c7" }}>Mode</div>
               <select
@@ -1931,6 +2041,23 @@ export default function PoseRepCounter() {
           >
             {repState.feedback || "Move into frame to begin."}
           </div>
+
+          {coachCue && (
+            <div
+              style={{
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(255,255,255,0.02)",
+                color: "rgba(230, 237, 246, 0.92)",
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              {coachCue}
+            </div>
+          )}
 
           {planState.active && activePlanStep && (
             <div
