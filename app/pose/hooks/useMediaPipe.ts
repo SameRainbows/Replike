@@ -30,7 +30,7 @@ export function useMediaPipe(
                     if (active && !pm) onStatusChange("error", "Model load is taking a long time...");
                 }, 10000);
 
-                const vision = await FilesetResolver.forVisionTasks("/wasm");
+                const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
                 pm = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
