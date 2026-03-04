@@ -63,6 +63,7 @@ body {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -390,6 +391,7 @@ a {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -432,6 +434,7 @@ a {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -442,8 +445,25 @@ a {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* 
+  Mobile responsiveness
+*/
+.workout-controls-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .workout-controls-grid {
+    grid-template-columns: 1fr;
   }
 }

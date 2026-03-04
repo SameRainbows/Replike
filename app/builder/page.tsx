@@ -10,6 +10,8 @@ import {
   upsertCustomWorkout,
 } from "@/app/lib/customWorkouts";
 
+import { ALL_EXERCISE_IDS as import_ALL_EXERCISE_IDS, EXERCISE_LABELS as import_EXERCISE_LABELS } from "@/app/pose/exercises/types";
+
 function newId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -289,7 +291,7 @@ export default function BuilderPage() {
                               <div className="muted" style={{ fontSize: 12 }}>
                                 Exercise
                               </div>
-                              <input
+                              <select
                                 value={s.exercise}
                                 onChange={(e) => {
                                   const next = [...active.steps];
@@ -304,8 +306,15 @@ export default function BuilderPage() {
                                   padding: "10px 12px",
                                   fontSize: 14,
                                   outline: "none",
+                                  cursor: "pointer",
                                 }}
-                              />
+                              >
+                                {import_ALL_EXERCISE_IDS.map(id => (
+                                  <option key={id} value={id} style={{ background: "#0e111a", color: "#e6edf6" }}>
+                                    {import_EXERCISE_LABELS[id]}
+                                  </option>
+                                ))}
+                              </select>
                             </label>
 
                             {s.kind === "work_reps" ? (

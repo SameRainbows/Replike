@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { clearSessions, loadSessions, type WorkoutSession } from "@/app/lib/workoutHistory";
+import { useRef, useEffect, useMemo, useState } from "react";
+import { clearSessions, loadSessions, saveSessions, type WorkoutSession } from "@/app/lib/workoutHistory";
 
 function formatDuration(sec: number) {
   const s = Math.max(0, Math.floor(sec));
@@ -12,10 +12,52 @@ function formatDuration(sec: number) {
 
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSessions(loadSessions());
   }, []);
+
+  const handleExport = () => {
+    if (sessions.length === 0) return;
+    const data = JSON.stringify(sessions, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `repdetect_history_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed)) {
+          // Simplistic merge: prefer existing based on ID, add new ones
+          const existingIds = new Set(sessions.map(s => s.id));
+          const toAdd = parsed.filter(s => s.id && typeof s.totalReps === "number" && !existingIds.has(s.id));
+
+          if (toAdd.length > 0) {
+            const merged = [...sessions, ...toAdd].sort((a, b) => b.endedAt - a.endedAt);
+            saveSessions(merged);
+            setSessions(merged);
+            alert(`Imported ${toAdd.length} new sessions.`);
+          } else {
+            alert("No new sessions found in file.");
+          }
+        }
+      } catch (err) {
+        alert("Failed to parse history file.");
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
 
   const hasSessions = sessions.length > 0;
 
@@ -38,21 +80,49 @@ export default function HistoryPage() {
         <div className="muted" style={{ fontSize: 13 }}>
           {hasSessions ? `${sessions.length} session${sessions.length === 1 ? "" : "s"}` : "No sessions yet."}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (!hasSessions) return;
-            const ok = window.confirm("Clear all saved sessions?");
-            if (!ok) return;
-            clearSessions();
-            setSessions([]);
-          }}
-          className="btn"
-          style={{ height: 38, padding: "0 12px" }}
-          disabled={!hasSessions}
-        >
-          Clear history
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ height: 38, padding: "0 12px" }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import data
+          </button>
+          <input
+            type="file"
+            accept=".json"
+            ref={fileInputRef}
+            onChange={handleImport}
+            style={{ display: "none" }}
+          />
+
+          <button
+            type="button"
+            className="btn"
+            style={{ height: 38, padding: "0 12px" }}
+            onClick={handleExport}
+            disabled={!hasSessions}
+          >
+            Export data
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!hasSessions) return;
+              const ok = window.confirm("Clear all saved sessions?");
+              if (!ok) return;
+              clearSessions();
+              setSessions([]);
+            }}
+            className="btn"
+            style={{ height: 38, padding: "0 12px", border: "1px solid rgba(255, 80, 80, 0.28)", color: "#ffd0d0" }}
+            disabled={!hasSessions}
+          >
+            Clear history
+          </button>
+        </div>
       </div>
 
       {rows.map(({ s, entries }) => (

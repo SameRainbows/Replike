@@ -36,6 +36,13 @@ export default function NavBar() {
             History
           </Link>
           <Link
+            className={`nav__link${pathname === "/trends" ? " nav__link--active" : ""}`}
+            href="/trends"
+            aria-current={pathname === "/trends" ? "page" : undefined}
+          >
+            Trends
+          </Link>
+          <Link
             className={`nav__link${pathname === "/settings" ? " nav__link--active" : ""}`}
             href="/settings"
             aria-current={pathname === "/settings" ? "page" : undefined}
