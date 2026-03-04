@@ -1,6 +1,7 @@
 import React from "react";
 import type { ExerciseId } from "../exercises/types";
 import { EXERCISE_LABELS } from "../exercises/types";
+import { ExerciseAnimation } from "./ExerciseAnimation";
 
 interface ExerciseDemoModalProps {
     exercise: ExerciseId;
@@ -68,6 +69,9 @@ export function ExerciseDemoModal({ exercise, onClose }: ExerciseDemoModalProps)
                 </div>
 
                 <div className="surface--inset" style={{ padding: 16, display: "grid", gap: 12 }}>
+
+                    <ExerciseAnimation exercise={exercise} />
+
                     <div style={{ fontWeight: 800, fontSize: 14 }}>How to do it:</div>
                     <div className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
                         {info.hint}

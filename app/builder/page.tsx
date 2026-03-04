@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   deleteCustomWorkout,
   loadCustomWorkouts,
+  decodeCustomWorkout,
   type CustomWorkout,
   type CustomWorkoutStep,
   upsertCustomWorkout,
@@ -61,6 +62,24 @@ export default function BuilderPage() {
     if (activeId) return;
     if (workouts.length > 0) setActiveId(workouts[0].id);
   }, [workouts, activeId]);
+
+  useEffect(() => {
+    // Handle incoming shared workouts
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const importCode = params.get("import");
+      if (importCode) {
+        const decoded = decodeCustomWorkout(importCode);
+        if (decoded) {
+          const newW = { ...decoded, id: `cw_${newId()}`, name: `${decoded.name} (Shared)` };
+          setWorkouts((prev) => upsertCustomWorkout(newW));
+          setActiveId(newW.id);
+          // Clean URL without reload
+          window.history.replaceState(null, "", "/builder");
+        }
+      }
+    }
+  }, []);
 
   function save(next: CustomWorkout) {
     const updated: CustomWorkout = { ...next, updatedAt: Date.now() };

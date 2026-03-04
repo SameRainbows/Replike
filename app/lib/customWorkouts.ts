@@ -1,21 +1,21 @@
 export type CustomWorkoutStep =
   | {
-      kind: "work_reps";
-      exercise: string;
-      targetReps: number;
-      label: string;
-    }
+    kind: "work_reps";
+    exercise: string;
+    targetReps: number;
+    label: string;
+  }
   | {
-      kind: "work_time";
-      exercise: string;
-      workSec: number;
-      label: string;
-    }
+    kind: "work_time";
+    exercise: string;
+    workSec: number;
+    label: string;
+  }
   | {
-      kind: "rest";
-      restSec: number;
-      label: string;
-    };
+    kind: "rest";
+    restSec: number;
+    label: string;
+  };
 
 export type CustomWorkout = {
   id: string;
@@ -63,4 +63,24 @@ export function deleteCustomWorkout(id: string): CustomWorkout[] {
   const next = all.filter((w) => w.id !== id);
   saveCustomWorkouts(next);
   return next;
+}
+
+export function encodeCustomWorkout(w: CustomWorkout): string {
+  try {
+    const raw = JSON.stringify(w);
+    return btoa(encodeURIComponent(raw));
+  } catch {
+    return "";
+  }
+}
+
+export function decodeCustomWorkout(encoded: string): CustomWorkout | null {
+  try {
+    const raw = decodeURIComponent(atob(encoded));
+    const w = JSON.parse(raw);
+    if (!w.id || !w.name || !Array.isArray(w.steps)) return null;
+    return w as CustomWorkout;
+  } catch {
+    return null;
+  }
 }

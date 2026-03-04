@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { ExerciseId } from "../exercises/types";
 import { EXERCISE_LABELS, ALL_EXERCISE_IDS } from "../exercises/types";
-import type { CustomWorkout } from "../../lib/customWorkouts";
+import { type CustomWorkout, encodeCustomWorkout } from "../../lib/customWorkouts";
 import { ExerciseDemoModal } from "./ExerciseDemoModal";
 
 type PlanMode = "free" | "plan" | "custom";
@@ -141,7 +141,33 @@ export function WorkoutControls({
 
                     {planMode === "custom" && (
                         <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 12, color: "#a7b4c7" }}>Select workout</label>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <label style={{ fontSize: 12, color: "#a7b4c7" }}>Select workout</label>
+                                {activeCustomWorkout && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const code = encodeCustomWorkout(activeCustomWorkout);
+                                            if (code) {
+                                                const url = `${window.location.origin}/builder?import=${code}`;
+                                                navigator.clipboard.writeText(url).then(() => alert("Share Link copied to clipboard!"));
+                                            }
+                                        }}
+                                        style={{
+                                            background: "rgba(60, 242, 176, 0.1)",
+                                            border: "1px solid rgba(60, 242, 176, 0.2)",
+                                            color: "#3cf2b0",
+                                            fontSize: 11,
+                                            cursor: "pointer",
+                                            padding: "2px 8px",
+                                            borderRadius: 999,
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        Share
+                                    </button>
+                                )}
+                            </div>
                             <select
                                 value={activeCustomWorkout?.id || ""}
                                 onChange={(e) => onCustomWorkoutSelect(e.target.value)}
