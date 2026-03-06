@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { loadSessions, type WorkoutSession } from "@/app/lib/workoutHistory";
 import { EXERCISE_LABELS } from "@/app/pose/exercises/types";
 import { generateCoachInsight } from "@/app/lib/coach";
+import { calculateStreak } from "@/app/lib/streaks";
+import { DailyLog } from "./components/DailyLog";
 
 export default function TrendsPage() {
     const [sessions, setSessions] = useState<WorkoutSession[]>([]);
@@ -64,6 +66,8 @@ export default function TrendsPage() {
         return days;
     }, [sessions]);
 
+    const streaks = useMemo(() => calculateStreak(sessions), [sessions]);
+
     return (
         <section className="stack">
             <header className="stack" style={{ marginBottom: 12 }}>
@@ -101,6 +105,8 @@ export default function TrendsPage() {
                     </div>
                 </div>
             </div>
+
+            <DailyLog />
 
             {sessions.length === 0 ? (
                 <div className="card">
@@ -155,6 +161,38 @@ export default function TrendsPage() {
                             <div className="card__title">Time Active</div>
                             <div style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)" }}>
                                 {Math.floor(stats.totalTimeSec / 60)} <span style={{ fontSize: 16 }}>min</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid">
+                        <div className="card stack">
+                            <div className="card__title">Current Streak</div>
+                            <div style={{ fontSize: 36, fontWeight: 800, color: "#ff8c6b" }}>
+                                {streaks.current} <span style={{ fontSize: 16 }}>days</span>
+                            </div>
+                            {streaks.isCurrentlyActive ? (
+                                <div style={{ fontSize: 13, color: "#3cf2b0" }}>🔥 Active today</div>
+                            ) : (
+                                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Complete a workout today to continue</div>
+                            )}
+                        </div>
+                        <div className="card stack">
+                            <div className="card__title">Best Streak</div>
+                            <div style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)" }}>
+                                {streaks.best} <span style={{ fontSize: 16 }}>days</span>
+                            </div>
+                        </div>
+                        <div className="card stack">
+                            <div className="card__title">Trophy Cabinet</div>
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                                {stats.totalWorkouts >= 1 && <div title="First Workout" style={{ fontSize: 24 }}>🌱</div>}
+                                {stats.totalWorkouts >= 10 && <div title="10 Workouts" style={{ fontSize: 24 }}>🥉</div>}
+                                {stats.totalWorkouts >= 50 && <div title="50 Workouts" style={{ fontSize: 24 }}>🥈</div>}
+                                {stats.totalWorkouts >= 100 && <div title="Century Club" style={{ fontSize: 24 }}>🥇</div>}
+                                {streaks.best >= 3 && <div title="3 Day Streak" style={{ fontSize: 24 }}>🔥</div>}
+                                {streaks.best >= 7 && <div title="7 Day Streak" style={{ fontSize: 24 }}>🌋</div>}
+                                {stats.totalWorkouts === 0 && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Earn your first trophy by working out!</div>}
                             </div>
                         </div>
                     </div>

@@ -2,16 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { loadSessions } from "../lib/workoutHistory";
+import { calculateStreak } from "../lib/streaks";
 
 export default function NavBar() {
   const pathname = usePathname();
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    // Load explicitly in client to avoid hydration mismatch
+    const syncSt = () => {
+      const s = loadSessions();
+      setStreak(calculateStreak(s).current);
+    };
+    syncSt();
+    // Re-check automatically
+    window.addEventListener("repdetect:history", syncSt);
+    return () => window.removeEventListener("repdetect:history", syncSt);
+  }, []);
 
   return (
     <header className="nav">
       <div className="container nav__inner">
-        <Link className="brand" href="/">
-          RepDetect
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Link className="brand" href="/">
+            RepDetect
+          </Link>
+          {streak > 0 && (
+            <div title={`${streak} day streak!`} style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255, 100, 80, 0.15)", color: "#ff8c6b", padding: "4px 10px", borderRadius: 12, fontSize: 13, fontWeight: 800 }}>
+              <span style={{ fontSize: 16 }}>🔥</span> {streak}
+            </div>
+          )}
+        </div>
 
         <nav className="nav__links" aria-label="Primary">
           <Link

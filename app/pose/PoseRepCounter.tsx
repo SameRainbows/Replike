@@ -44,6 +44,7 @@ import {
 import { loadSettings, type AppSettings } from "../lib/settings";
 import { playBeep } from "../lib/sound";
 import { appendSession } from "../lib/workoutHistory";
+import { speechCoach } from "../lib/speech";
 
 type PlanMode = "free" | "plan" | "custom";
 type Status = "init" | "loading" | "running" | "error";
@@ -62,6 +63,7 @@ export default function PoseRepCounter() {
     calibrationEnabled: true,
     soundOnRep: true,
     soundOnGoal: true,
+    voiceCoachEnabled: true,
   });
 
   // Derived/Internal State
@@ -247,10 +249,18 @@ export default function PoseRepCounter() {
       });
 
       const cue = getCoachCue(exercise, repState);
-      if (cue) setCoachCue(cue);
+      if (cue) {
+        setCoachCue(cue);
+        if (settings.voiceCoachEnabled) speechCoach.speak(cue);
+      } else if (settings.voiceCoachEnabled && settings.soundOnRep) {
+        // Just say the rep count if there's no form correction
+        speechCoach.speak(repState.repCount.toString());
+      } else if (settings.soundOnRep) {
+        playBeep("rep"); // Fallback to beep if voice disabled
+      }
     }
     prevRepCount.current = repState.repCount;
-  }, [repState.repCount, repState.feedback, exercise, settings.soundOnRep]);
+  }, [repState.repCount, repState.feedback, exercise, settings.soundOnRep, settings.voiceCoachEnabled]);
 
   const saveSession = (mode: string) => {
     if (repState.repCount === 0 && qualityAgg.clean === 0 && qualityAgg.ok === 0 && qualityAgg.sloppy === 0) {

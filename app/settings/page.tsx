@@ -8,6 +8,7 @@ export default function SettingsPage() {
   const [calibrationEnabled, setCalibrationEnabled] = useState(false);
   const [soundOnRep, setSoundOnRep] = useState(true);
   const [soundOnGoal, setSoundOnGoal] = useState(true);
+  const [voiceCoachEnabled, setVoiceCoachEnabled] = useState(true);
 
   useEffect(() => {
     const s = loadSettings();
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       setCalibrationEnabled(next.calibrationEnabled);
       setSoundOnRep(next.soundOnRep);
       setSoundOnGoal(next.soundOnGoal);
+      setVoiceCoachEnabled(next.voiceCoachEnabled);
     };
     window.addEventListener("storage", onSettings);
     window.addEventListener("repdetect:settings", onSettings);
@@ -70,7 +72,7 @@ export default function SettingsPage() {
             onChange={(e) => {
               const next = e.target.checked;
               setCalibrationEnabled(next);
-              saveSettings({ calibrationEnabled: next, soundOnRep, soundOnGoal });
+              saveSettings({ calibrationEnabled: next, soundOnRep, soundOnGoal, voiceCoachEnabled });
             }}
             style={{ width: 20, height: 20 }}
           />
@@ -105,7 +107,7 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const next = e.target.checked;
                 setSoundOnRep(next);
-                saveSettings({ calibrationEnabled, soundOnRep: next, soundOnGoal });
+                saveSettings({ calibrationEnabled, soundOnRep: next, soundOnGoal, voiceCoachEnabled });
               }}
               style={{ width: 20, height: 20 }}
             />
@@ -136,7 +138,38 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const next = e.target.checked;
                 setSoundOnGoal(next);
-                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal: next });
+                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal: next, voiceCoachEnabled });
+              }}
+              style={{ width: 20, height: 20 }}
+            />
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: 12,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.18)",
+            }}
+          >
+            <div style={{ display: "grid", gap: 2 }}>
+              <div style={{ fontWeight: 800 }}>Voice Coach</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                The AI will audibly announce count and form adjustments.
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={voiceCoachEnabled}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setVoiceCoachEnabled(next);
+                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal, voiceCoachEnabled: next });
               }}
               style={{ width: 20, height: 20 }}
             />

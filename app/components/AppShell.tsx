@@ -1,4 +1,5 @@
 import NavBar from "@/app/components/NavBar";
+import { OnboardingModal } from "@/app/components/OnboardingModal";
 
 export default function AppShell({
   children,
@@ -17,6 +18,7 @@ export default function AppShell({
           <div className="muted">Best results with a steady camera and your full body visible.</div>
         </div>
       </footer>
+      <OnboardingModal />
     </div>
   );
 }
