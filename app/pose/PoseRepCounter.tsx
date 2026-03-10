@@ -193,19 +193,18 @@ export default function PoseRepCounter() {
       // Auto calib logic
       const isStable = true; // Simplified for refactor - real logic in utils
       if (isStable) {
-        setAutoCalib((prev) => {
-          const dt = prev.active ? nowMs - (prev.stableMs || nowMs) : 0; // simplistic
-          const newStableMs = prev.stableMs + 33; // ~1 frame
+        const dt = autoCalib.active ? nowMs - (autoCalib.stableMs || nowMs) : 0;
+        const newStableMs = autoCalib.stableMs + 33; // ~1 frame
 
-          if (newStableMs > 900) {
-            runCapture(exercise, 0, landmarks);
-            runCapture(exercise, 1, landmarks); // Needs real 2-stage in real auto-calib, simplified
-            showToast("Auto-calibrated!");
-            return { active: false, stableMs: 0 };
-          }
-          return { active: true, stableMs: newStableMs };
-        });
-        setAutoCalibHint("Hold still...");
+        if (newStableMs > 900) {
+          runCapture(exercise, 0, landmarks);
+          runCapture(exercise, 1, landmarks); // Needs real 2-stage in real auto-calib, simplified
+          showToast("Auto-calibrated!");
+          setAutoCalib({ active: false, stableMs: 0 });
+        } else {
+          setAutoCalib({ active: true, stableMs: newStableMs });
+          setAutoCalibHint("Hold still...");
+        }
       } else {
         setAutoCalib({ active: true, stableMs: 0 });
         setAutoCalibHint("Move into open/starting position");

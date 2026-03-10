@@ -12,6 +12,11 @@ export function useMediaPipe(
     const rAFRef = useRef<number>(0);
     const sessionRunningRef = useRef(false);
 
+    const onPoseResultRef = useRef(onPoseResult);
+    useEffect(() => {
+        onPoseResultRef.current = onPoseResult;
+    }, [onPoseResult]);
+
     // Expose a setter ref so we can toggle from parent without re-rendering everything
     const setSessionRunning = (val: boolean) => {
         sessionRunningRef.current = val;
@@ -115,7 +120,7 @@ export function useMediaPipe(
 
                         // Only pass to state machines if running
                         if (sessionRunningRef.current) {
-                            onPoseResult(result, Date.now());
+                            onPoseResultRef.current(result, Date.now());
                         }
                     });
                 };
