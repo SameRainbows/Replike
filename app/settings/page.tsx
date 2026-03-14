@@ -8,6 +8,7 @@ export default function SettingsPage() {
   const [calibrationEnabled, setCalibrationEnabled] = useState(false);
   const [soundOnRep, setSoundOnRep] = useState(true);
   const [soundOnGoal, setSoundOnGoal] = useState(true);
+  const [theme, setTheme] = useState<"dark" | "light" | "system">("system");
 
   useEffect(() => {
     const s = loadSettings();
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       setCalibrationEnabled(next.calibrationEnabled);
       setSoundOnRep(next.soundOnRep);
       setSoundOnGoal(next.soundOnGoal);
+      setTheme(next.theme);
     };
     window.addEventListener("storage", onSettings);
     window.addEventListener("repdetect:settings", onSettings);
@@ -70,7 +72,7 @@ export default function SettingsPage() {
             onChange={(e) => {
               const next = e.target.checked;
               setCalibrationEnabled(next);
-              saveSettings({ calibrationEnabled: next, soundOnRep, soundOnGoal });
+              saveSettings({ calibrationEnabled: next, soundOnRep, soundOnGoal, theme });
             }}
             style={{ width: 20, height: 20 }}
           />
@@ -105,7 +107,7 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const next = e.target.checked;
                 setSoundOnRep(next);
-                saveSettings({ calibrationEnabled, soundOnRep: next, soundOnGoal });
+                saveSettings({ calibrationEnabled, soundOnRep: next, soundOnGoal, theme });
               }}
               style={{ width: 20, height: 20 }}
             />
@@ -136,10 +138,59 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const next = e.target.checked;
                 setSoundOnGoal(next);
-                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal: next });
+                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal: next, theme });
               }}
               style={{ width: 20, height: 20 }}
             />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="card__title">Appearance</div>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: 12,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.18)",
+            }}
+          >
+            <div style={{ display: "grid", gap: 2 }}>
+              <div style={{ fontWeight: 800 }}>Theme Profile</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                Select between dark, light, or match your system.
+              </div>
+            </div>
+
+            <select
+              value={theme}
+              onChange={(e) => {
+                const next = e.target.value as "dark" | "light" | "system";
+                setTheme(next);
+                saveSettings({ calibrationEnabled, soundOnRep, soundOnGoal, theme: next });
+              }}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                color: "var(--text)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 8,
+                padding: "8px 12px",
+                outline: "none",
+                cursor: "pointer",
+                appearance: "none", // Remove default styling for better custom look on windows
+                width: 100, // Fixed width
+                textAlign: "center"
+              }}
+            >
+              <option value="system" style={{ background: "var(--bg0)" }}>System</option>
+              <option value="dark" style={{ background: "var(--bg0)" }}>Dark</option>
+              <option value="light" style={{ background: "var(--bg0)" }}>Light</option>
+            </select>
           </label>
         </div>
 

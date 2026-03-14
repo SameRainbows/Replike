@@ -12,6 +12,7 @@ interface WorkoutControlsProps {
     planMode: PlanMode;
     exercise: ExerciseId;
     sessionRunning: boolean;
+    hasStarted: boolean;
     activePlan: any;
     activeCustomWorkout: CustomWorkout | null;
     customWorkouts: CustomWorkout[];
@@ -35,6 +36,7 @@ export function WorkoutControls({
     planMode,
     exercise,
     sessionRunning,
+    hasStarted,
     activePlan,
     activeCustomWorkout,
     customWorkouts,
@@ -221,7 +223,7 @@ export function WorkoutControls({
                                 alignSelf: "end",
                             }}
                         >
-                            {sessionRunning ? "Pause" : "Resume"}
+                            {sessionRunning ? "Pause" : hasStarted ? "Resume" : "Start Workout"}
                         </button>
                     )}
 

@@ -34,6 +34,7 @@ import {
   SetupWizardModal,
   CalibrationPanel,
   ManualCalibModal,
+  ModelLoader,
 } from "./components";
 
 // Storage/Libs
@@ -62,7 +63,10 @@ export default function PoseRepCounter() {
     calibrationEnabled: true,
     soundOnRep: true,
     soundOnGoal: true,
+    theme: "system",
   });
+
+  const hasStartedRef = useRef(false);
 
   // Derived/Internal State
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -294,6 +298,7 @@ export default function PoseRepCounter() {
           planMode={planMode}
           exercise={exercise}
           sessionRunning={sessionRunning}
+          hasStarted={hasStartedRef.current}
           activePlan={PRESET_PLANS.find(p => p.id === selectedPlanId)}
           activeCustomWorkout={customWorkouts.find(w => w.id === selectedCustomId) || null}
           customWorkouts={customWorkouts}
@@ -307,7 +312,10 @@ export default function PoseRepCounter() {
             setSessionRunningState(false);
           }}
           onPlanModeChange={setPlanMode}
-          onSessionToggle={() => setSessionRunningState(!sessionRunning)}
+          onSessionToggle={() => {
+            if (!sessionRunning) hasStartedRef.current = true;
+            setSessionRunningState(!sessionRunning);
+          }}
           onSetupClick={() => setSetupOpen(true)}
           onPlanStartStop={() => setPlanState(s => ({ ...s, active: !s.active }))}
           onCustomStartStop={() => setCustomState(s => ({ ...s, active: !s.active }))}
@@ -398,20 +406,34 @@ export default function PoseRepCounter() {
             border: "1px solid rgba(255, 80, 80, 0.35)",
             background: "rgba(255, 80, 80, 0.08)",
             color: "#ffd0d0",
+            marginBottom: 16,
           }}
         >
           {errorMessage ?? "Unknown error"}
         </div>
       )}
 
-      <VideoOverlay
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        autoCalibActive={calibRest.autoCalib.active}
-        calibrationEnabled={settings.calibrationEnabled}
-        autoCalibHint={calibRest.autoCalibHint}
-        autoCalibStableMs={calibRest.autoCalib.stableMs}
-      />
+      {(status === "init" || status === "loading") && (
+        <ModelLoader />
+      )}
+
+      <div
+        style={{
+          position: status === "init" || status === "loading" ? "absolute" : "relative",
+          opacity: status === "init" || status === "loading" ? 0 : 1,
+          pointerEvents: status === "init" || status === "loading" ? "none" : "auto",
+          visibility: status === "init" || status === "loading" ? "hidden" : "visible",
+        }}
+      >
+        <VideoOverlay
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          autoCalibActive={calibRest.autoCalib.active}
+          calibrationEnabled={settings.calibrationEnabled}
+          autoCalibHint={calibRest.autoCalibHint}
+          autoCalibStableMs={calibRest.autoCalib.stableMs}
+        />
+      </div>
 
       {summaryOpen && (
         <SessionSummaryModal lastSummary={lastSummary} onClose={() => setSummaryOpen(false)} />

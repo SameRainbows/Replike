@@ -5,3 +5,4 @@ export * from "./SessionSummaryModal";
 export * from "./SetupWizardModal";
 export * from "./VideoOverlay";
 export * from "./WorkoutControls";
+export * from "./ModelLoader";

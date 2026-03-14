@@ -1,5 +1,6 @@
 import NavBar from "@/app/components/NavBar";
 import { OnboardingModal } from "@/app/components/OnboardingModal";
+import { ThemeProvider } from "@/app/components/ThemeProvider";
 
 export default function AppShell({
   children,
@@ -8,6 +9,7 @@ export default function AppShell({
 }>) {
   return (
     <div className="app">
+      <ThemeProvider />
       <NavBar />
       <main className="container app__main">
         <div className="page">{children}</div>

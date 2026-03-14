@@ -28,6 +28,23 @@ body {
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+[data-theme="light"] {
+  --bg0: #f8fafc;
+  --bg1: #e2e8f0;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-2: rgba(255, 255, 255, 0.6);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-2: rgba(0, 0, 0, 0.12);
+  --text: rgba(15, 23, 42, 0.98);
+  --muted: rgba(71, 85, 105, 0.95);
+
+  --accent: rgba(16, 185, 129, 1); 
+  --accent-2: rgba(59, 130, 246, 1);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 18px 44px rgba(0, 0, 0, 0.1);
+}
+
 .split {
   display: grid;
   gap: 12px;
