@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+
 
 export function ModelLoader() {
   return (
@@ -17,24 +17,30 @@ export function ModelLoader() {
         border: "1px dashed var(--border)",
       }}
     >
+      <style>{`
+        @keyframes pulseAura {
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.4); opacity: 0; }
+        }
+        @keyframes pulseJoint {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.2); }
+        }
+        @keyframes flexArm {
+          0%, 100% { transform: rotate(10deg); }
+          50% { transform: rotate(-110deg); }
+        }
+      `}</style>
       <div style={{ position: "relative", width: 80, height: 80 }}>
         {/* Pulsing Background Aura */}
-        <motion.div
-          animate={{
-            scale: [1, 1.4, 1],
-            opacity: [0.15, 0, 0.15],
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+        <div
           style={{
             position: "absolute",
             inset: 0,
             borderRadius: "50%",
             background: "var(--accent)",
             filter: "blur(8px)",
+            animation: "pulseAura 1.5s ease-in-out infinite"
           }}
         />
 
@@ -67,9 +73,7 @@ export function ModelLoader() {
         />
         
         {/* Middle Joint (Elbow/Knee) */}
-        <motion.div
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        <div
           style={{ 
             position: "absolute", 
             left: "calc(50% - 6px)", 
@@ -79,14 +83,13 @@ export function ModelLoader() {
             borderRadius: "50%", 
             background: "var(--accent)", 
             zIndex: 2, 
-            boxShadow: "0 0 15px var(--accent)" 
+            boxShadow: "0 0 15px var(--accent)",
+            animation: "pulseJoint 1.5s ease-in-out infinite"
           }} 
         />
         
         {/* Bottom Bone & Joint Group (Forearm/Calf) */}
-        <motion.div
-          animate={{ rotate: [10, -110, 10] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        <div
           style={{
             position: "absolute",
             left: "calc(50% - 3px)",
@@ -96,6 +99,7 @@ export function ModelLoader() {
             background: "rgba(255,255,255,0.8)",
             borderRadius: 3,
             transformOrigin: "top center",
+            animation: "flexArm 1.5s ease-in-out infinite"
           }}
         >
           {/* Bottom Joint (Wrist/Ankle) */}
@@ -112,7 +116,7 @@ export function ModelLoader() {
               boxShadow: "0 0 10px var(--accent-2)"
             }} 
           />
-        </motion.div>
+        </div>
       </div>
 
       <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
