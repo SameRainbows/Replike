@@ -156,9 +156,9 @@ export function WorkoutControls({
                                             }
                                         }}
                                         style={{
-                                            background: "rgba(60, 242, 176, 0.1)",
-                                            border: "1px solid rgba(60, 242, 176, 0.2)",
-                                            color: "#3cf2b0",
+                                            background: "rgba(232, 132, 94, 0.1)",
+                                            border: "1px solid rgba(232, 132, 94, 0.2)",
+                                            color: "var(--accent)",
                                             fontSize: 11,
                                             cursor: "pointer",
                                             padding: "2px 8px",
@@ -211,11 +211,11 @@ export function WorkoutControls({
                             type="button"
                             onClick={onSessionToggle}
                             style={{
-                                background: sessionRunning ? "rgba(255, 180, 80, 0.12)" : "rgba(60, 242, 176, 0.14)",
+                                background: sessionRunning ? "rgba(255, 180, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
                                 color: sessionRunning ? "#ffd8a8" : "#e6edf6",
                                 border: sessionRunning
                                     ? "1px solid rgba(255, 180, 80, 0.28)"
-                                    : "1px solid rgba(60, 242, 176, 0.35)",
+                                    : "1px solid rgba(232, 132, 94, 0.35)",
                                 borderRadius: 10,
                                 padding: "10px 12px",
                                 fontSize: 14,
@@ -249,11 +249,11 @@ export function WorkoutControls({
                             type="button"
                             onClick={onPlanStartStop}
                             style={{
-                                background: planStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(60, 242, 176, 0.14)",
+                                background: planStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
                                 color: "#e6edf6",
                                 border: planStateActive
                                     ? "1px solid rgba(255, 80, 80, 0.28)"
-                                    : "1px solid rgba(60, 242, 176, 0.35)",
+                                    : "1px solid rgba(232, 132, 94, 0.35)",
                                 borderRadius: 10,
                                 padding: "10px 12px",
                                 fontSize: 14,
@@ -271,11 +271,11 @@ export function WorkoutControls({
                             type="button"
                             onClick={onCustomStartStop}
                             style={{
-                                background: customStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(60, 242, 176, 0.14)",
+                                background: customStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
                                 color: "#e6edf6",
                                 border: customStateActive
                                     ? "1px solid rgba(255, 80, 80, 0.28)"
-                                    : "1px solid rgba(60, 242, 176, 0.35)",
+                                    : "1px solid rgba(232, 132, 94, 0.35)",
                                 borderRadius: 10,
                                 padding: "10px 12px",
                                 fontSize: 14,
@@ -310,9 +310,9 @@ export function WorkoutControls({
                             type="button"
                             onClick={onSaveSession}
                             style={{
-                                background: "rgba(60, 242, 176, 0.14)",
+                                background: "rgba(232, 132, 94, 0.14)",
                                 color: "#e6edf6",
-                                border: "1px solid rgba(60, 242, 176, 0.35)",
+                                border: "1px solid rgba(232, 132, 94, 0.35)",
                                 borderRadius: 10,
                                 padding: "10px 12px",
                                 fontSize: 14,

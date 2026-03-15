@@ -58,9 +58,9 @@ export function OnboardingModal() {
                                         key={g.id}
                                         onClick={() => setGoal(g.id)}
                                         style={{
-                                            background: goal === g.id ? "rgba(60, 242, 176, 0.15)" : "rgba(255,255,255,0.05)",
-                                            border: goal === g.id ? "1px solid rgba(60, 242, 176, 0.5)" : "1px solid rgba(255,255,255,0.1)",
-                                            color: goal === g.id ? "#3cf2b0" : "#fff",
+                                            background: goal === g.id ? "rgba(232, 132, 94, 0.15)" : "rgba(255,255,255,0.05)",
+                                            border: goal === g.id ? "1px solid rgba(232, 132, 94, 0.4)" : "1px solid rgba(255,255,255,0.1)",
+                                            color: goal === g.id ? "var(--accent)" : "#fff",
                                             padding: 16,
                                             borderRadius: 12,
                                             textAlign: "left",
@@ -102,8 +102,8 @@ export function OnboardingModal() {
                                         key={l.id}
                                         onClick={() => setLevel(l.id)}
                                         style={{
-                                            background: level === l.id ? "rgba(60, 242, 176, 0.15)" : "rgba(255,255,255,0.05)",
-                                            border: level === l.id ? "1px solid rgba(60, 242, 176, 0.5)" : "1px solid rgba(255,255,255,0.1)",
+                                            background: level === l.id ? "rgba(232, 132, 94, 0.15)" : "rgba(255,255,255,0.05)",
+                                            border: level === l.id ? "1px solid rgba(232, 132, 94, 0.4)" : "1px solid rgba(255,255,255,0.1)",
                                             color: "#fff",
                                             padding: 16,
                                             borderRadius: 12,
@@ -114,8 +114,8 @@ export function OnboardingModal() {
                                             gap: 4
                                         }}
                                     >
-                                        <div style={{ fontWeight: 800, fontSize: 16, color: level === l.id ? "#3cf2b0" : "#fff" }}>{l.label}</div>
-                                        <div style={{ fontSize: 13, color: level === l.id ? "rgba(60, 242, 176, 0.8)" : "rgba(255,255,255,0.5)" }}>{l.sub}</div>
+                                        <div style={{ fontWeight: 800, fontSize: 16, color: level === l.id ? "var(--accent)" : "#fff" }}>{l.label}</div>
+                                        <div style={{ fontSize: 13, color: level === l.id ? "rgba(232, 132, 94, 0.8)" : "rgba(255,255,255,0.5)" }}>{l.sub}</div>
                                     </button>
                                 ))}
                             </div>

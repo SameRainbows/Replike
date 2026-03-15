@@ -49,7 +49,7 @@ export function RepLog({ events, onClear }: RepLogProps) {
                                 justifyContent: "space-between",
                                 gap: 10,
                                 fontSize: 12,
-                                color: ev.kind === "rep" ? "#d6ffe9" : "#ffd0d0",
+                                color: ev.kind === "rep" ? "#ededec" : "#ffd0d0",
                                 border: "1px solid rgba(255,255,255,0.08)",
                                 background: "rgba(0,0,0,0.18)",
                                 borderRadius: 10,

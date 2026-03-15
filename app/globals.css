@@ -7,41 +7,41 @@ body {
 }
 
 :root {
-  --bg0: #070a10;
-  --bg1: #0b0f17;
-  --surface: rgba(255, 255, 255, 0.03);
+  --bg0: #0a0a0a;
+  --bg1: #111111;
+  --surface: rgba(255, 255, 255, 0.04);
   --surface-2: rgba(0, 0, 0, 0.18);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-2: rgba(255, 255, 255, 0.12);
-  --text: rgba(230, 237, 246, 0.98);
-  --muted: rgba(167, 180, 199, 0.95);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-2: rgba(255, 255, 255, 0.10);
+  --text: #ededec;
+  --muted: #a1a1a1;
 
-  --accent: rgba(60, 242, 176, 1);
-  --accent-2: rgba(84, 126, 255, 1);
+  --accent: #e8845e;
+  --accent-2: #f0b366;
 
   --r-sm: 10px;
   --r-md: 12px;
   --r-lg: 16px;
   --r-xl: 18px;
 
-  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 28px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 44px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 44px rgba(0, 0, 0, 0.5);
 
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 [data-theme="light"] {
-  --bg0: #f8fafc;
-  --bg1: #e2e8f0;
+  --bg0: #fafaf9;
+  --bg1: #f0eeeb;
   --surface: rgba(255, 255, 255, 0.85);
   --surface-2: rgba(255, 255, 255, 0.6);
   --border: rgba(0, 0, 0, 0.08);
   --border-2: rgba(0, 0, 0, 0.12);
-  --text: rgba(15, 23, 42, 0.98);
-  --muted: rgba(71, 85, 105, 0.95);
+  --text: #1a1a1a;
+  --muted: #5a5a5a;
 
-  --accent: rgba(16, 185, 129, 1); 
-  --accent-2: rgba(59, 130, 246, 1);
+  --accent: #c96a42;
+  --accent-2: #d49340;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 18px 44px rgba(0, 0, 0, 0.1);
@@ -62,10 +62,8 @@ body {
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
     Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(1100px 720px at 28% -10%, rgba(84, 126, 255, 0.20), transparent 55%),
-    radial-gradient(900px 600px at 76% 0%, rgba(60, 242, 176, 0.16), transparent 60%),
-    radial-gradient(900px 520px at 50% 120%, rgba(84, 126, 255, 0.10), transparent 62%),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
+  background: radial-gradient(900px 500px at 50% 100%, rgba(232, 132, 94, 0.06), transparent 70%),
+    var(--bg0);
   background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -127,7 +125,7 @@ a {
   top: 0;
   z-index: 10;
   backdrop-filter: blur(12px);
-  background: rgba(11, 15, 23, 0.66);
+  background: rgba(10, 10, 10, 0.72);
   border-bottom: 1px solid var(--border);
 }
 
@@ -142,10 +140,7 @@ a {
   font-weight: 800;
   letter-spacing: -0.4px;
   font-size: 16px;
-  background: linear-gradient(90deg, rgba(230, 237, 246, 0.98), rgba(60, 242, 176, 0.92));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
 }
 
 .nav__links {
@@ -172,9 +167,9 @@ a {
 }
 
 .nav__link--active {
-  background: rgba(60, 242, 176, 0.12);
-  border-color: rgba(60, 242, 176, 0.30);
-  color: rgba(230, 237, 246, 0.98);
+  background: rgba(232, 132, 94, 0.12);
+  border-color: rgba(232, 132, 94, 0.30);
+  color: var(--text);
 }
 
 .footer {
@@ -197,13 +192,11 @@ a {
 }
 
 .hero {
-  border: 1px solid var(--border);
-  background: radial-gradient(1200px 520px at 18% 0%, rgba(60, 242, 176, 0.16), transparent 56%),
-    radial-gradient(900px 380px at 82% 10%, rgba(84, 126, 255, 0.20), transparent 56%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border: none;
+  background: transparent;
   border-radius: var(--r-xl);
   padding: 22px;
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
 }
 
 .hero__badge {
@@ -286,17 +279,17 @@ a {
 
 .btn:focus-visible,
 .nav__link:focus-visible {
-  outline: 2px solid rgba(60, 242, 176, 0.55);
+  outline: 2px solid rgba(232, 132, 94, 0.55);
   outline-offset: 2px;
 }
 
 .btn--primary {
-  border-color: rgba(60, 242, 176, 0.36);
-  background: rgba(60, 242, 176, 0.14);
+  border-color: rgba(232, 132, 94, 0.36);
+  background: rgba(232, 132, 94, 0.14);
 }
 
 .btn--primary:hover {
-  background: rgba(60, 242, 176, 0.18);
+  background: rgba(232, 132, 94, 0.20);
 }
 
 .grid {
@@ -330,10 +323,7 @@ a {
 
 @media (prefers-reduced-motion: no-preference) {
   .card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: var(--shadow-sm);
+    border-color: rgba(255, 255, 255, 0.10);
   }
 }
 
@@ -432,7 +422,7 @@ a {
   gap: 12px;
   border-radius: var(--r-xl);
   border: 1px solid var(--border);
-  background: rgba(11, 15, 23, 0.88);
+  background: rgba(10, 10, 10, 0.92);
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(10px);
 }

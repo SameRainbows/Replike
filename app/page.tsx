@@ -34,21 +34,18 @@ export default function HomePage() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
+        style={{ textAlign: "left" }}
       >
-        <motion.div variants={itemVariants} className="hero__badge" style={{ display: "inline-block", marginBottom: 16 }}>
-          Private. In-browser. Real-time.
-        </motion.div>
-
         <motion.h1 variants={itemVariants} className="hero__title" style={{ fontSize: "clamp(2.5rem, 6vw, 4.5rem)", lineHeight: 1.1 }}>
           Count reps. Fix form. <br /> No app needed.
         </motion.h1>
 
-        <motion.p variants={itemVariants} className="hero__subtitle" style={{ maxWidth: 600, margin: "0 auto 32px auto", fontSize: "1.1rem" }}>
+        <motion.p variants={itemVariants} className="hero__subtitle" style={{ maxWidth: 600, fontSize: "1.1rem" }}>
           RepDetect watches your form through your camera and counts every rep — all
           inside your browser. Nothing is uploaded, ever.
         </motion.p>
 
-        <motion.div variants={itemVariants} className="hero__actions" style={{ justifyContent: "center", display: "flex", gap: 16 }}>
+        <motion.div variants={itemVariants} className="hero__actions" style={{ display: "flex", gap: 16 }}>
           <Link className="btn btn--primary" href="/workout" style={{ padding: "14px 32px", fontSize: "1.1rem" }}>
             Start Workout
           </Link>

@@ -78,9 +78,9 @@ export function ManualCalibModal({
                         type="button"
                         onClick={() => onCapture(manualCalibStep)}
                         style={{
-                            background: "rgba(60, 242, 176, 0.14)",
+                            background: "rgba(232, 132, 94, 0.14)",
                             color: "#e6edf6",
-                            border: "1px solid rgba(60, 242, 176, 0.35)",
+                            border: "1px solid rgba(232, 132, 94, 0.35)",
                             borderRadius: 12,
                             padding: "10px 12px",
                             fontSize: 14,

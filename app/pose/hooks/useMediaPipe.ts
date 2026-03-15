@@ -105,11 +105,11 @@ export function useMediaPipe(
                                     const drawingUtils = new DrawingUtils(ctx);
                                     for (const pose of result.landmarks) {
                                         drawingUtils.drawConnectors(pose, PoseLandmarker.POSE_CONNECTIONS, {
-                                            color: "rgba(60, 242, 176, 0.4)",
+                                            color: "rgba(232, 132, 94, 0.4)",
                                             lineWidth: 2,
                                         });
                                         drawingUtils.drawLandmarks(pose, {
-                                            color: "rgba(60, 242, 176, 0.9)",
+                                            color: "rgba(232, 132, 94, 0.9)",
                                             lineWidth: 2,
                                             radius: 3,
                                         });

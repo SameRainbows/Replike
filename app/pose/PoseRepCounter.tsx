@@ -331,7 +331,7 @@ export default function PoseRepCounter() {
               borderRadius: 12,
               padding: "10px 12px",
               background: "rgba(0,0,0,0.18)",
-              color: repState.feedback ? "#d6ffe9" : "#a7b4c7",
+              color: repState.feedback ? "#ededec" : "#a7b4c7",
               fontSize: 13,
               minHeight: 42,
               display: "flex",

@@ -75,8 +75,8 @@ export default function TrendsPage() {
             </header>
 
             <div className="card" style={{
-                background: "linear-gradient(145deg, rgba(60, 242, 176, 0.08) 0%, rgba(20, 30, 45, 0.4) 100%)",
-                border: "1px solid rgba(60, 242, 176, 0.2)",
+                background: "linear-gradient(145deg, rgba(232, 132, 94, 0.08) 0%, rgba(20, 20, 20, 0.4) 100%)",
+                border: "1px solid rgba(232, 132, 94, 0.15)",
                 display: "flex",
                 gap: 16,
                 alignItems: "flex-start",
@@ -86,11 +86,11 @@ export default function TrendsPage() {
                     width: 40,
                     height: 40,
                     borderRadius: 20,
-                    background: "rgba(60, 242, 176, 0.2)",
+                    background: "rgba(232, 132, 94, 0.15)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#3cf2b0",
+                    color: "var(--accent)",
                     flexShrink: 0
                 }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -98,8 +98,8 @@ export default function TrendsPage() {
                     </svg>
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: "#3cf2b0" }}>Smart Coach</div>
-                    <div style={{ fontSize: 14, color: "rgba(230,237,246,0.9)", lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: "var(--accent)" }}>Smart Coach</div>
+                    <div style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.5 }}>
                         {coachMessage}
                     </div>
                 </div>
@@ -131,9 +131,9 @@ export default function TrendsPage() {
                                         aspectRatio: "1/1",
                                         borderRadius: 4,
                                         background: d.count > 0
-                                            ? `rgba(60, 242, 176, ${Math.min(0.2 + (d.count * 0.2), 1)})`
-                                            : "rgba(255,255,255,0.05)",
-                                        border: d.count > 0 ? "1px solid rgba(60, 242, 176, 0.4)" : "1px solid rgba(255,255,255,0.02)"
+                                            ? `rgba(232, 132, 94, ${Math.min(0.2 + (d.count * 0.2), 1)})`
+                                            : "rgba(255,255,255,0.04)",
+                                        border: d.count > 0 ? "1px solid rgba(232, 132, 94, 0.3)" : "1px solid rgba(255,255,255,0.02)"
                                     }}
                                 />
                             ))}
@@ -168,7 +168,7 @@ export default function TrendsPage() {
                                 {streaks.current} <span style={{ fontSize: 16 }}>days</span>
                             </div>
                             {streaks.isCurrentlyActive ? (
-                                <div style={{ fontSize: 13, color: "#3cf2b0" }}>🔥 Active today</div>
+                                <div style={{ fontSize: 13, color: "var(--accent)" }}>🔥 Active today</div>
                             ) : (
                                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Complete a workout today to continue</div>
                             )}

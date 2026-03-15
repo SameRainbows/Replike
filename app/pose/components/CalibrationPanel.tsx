@@ -79,7 +79,7 @@ export function CalibrationPanel({
                 <div style={{ fontSize: 12, color: "#a7b4c7" }}>{exercise.replace("_", " ")} don’t require calibration.</div>
             ) : autoCalibActive ? (
                 <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontSize: 12, color: "#d6ffe9" }}>Auto-calibrating…</div>
+                    <div style={{ fontSize: 12, color: "#ededec" }}>Auto-calibrating…</div>
                     <div style={{ fontSize: 12, color: "#a7b4c7" }}>{autoCalibHint}</div>
                     <div
                         style={{
@@ -94,7 +94,7 @@ export function CalibrationPanel({
                             style={{
                                 height: "100%",
                                 width: `${Math.round((Math.min(900, autoCalibStableMs) / 900) * 100)}%`,
-                                background: "rgba(60, 242, 176, 0.55)",
+                                background: "rgba(232, 132, 94, 0.55)",
                             }}
                         />
                     </div>

@@ -126,8 +126,8 @@ export default function BuilderPage() {
                   style={{
                     textAlign: "left",
                     padding: 12,
-                    background: w.id === activeId ? "rgba(60, 242, 176, 0.08)" : "rgba(0,0,0,0.12)",
-                    borderColor: w.id === activeId ? "rgba(60, 242, 176, 0.25)" : "rgba(255,255,255,0.08)",
+                    background: w.id === activeId ? "rgba(232, 132, 94, 0.08)" : "rgba(0,0,0,0.12)",
+                    borderColor: w.id === activeId ? "rgba(232, 132, 94, 0.25)" : "rgba(255,255,255,0.08)",
                     cursor: "pointer",
                   }}
                 >

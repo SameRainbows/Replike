@@ -80,10 +80,10 @@ export function ExerciseDemoModal({ exercise, onClose }: ExerciseDemoModalProps)
                     <div style={{
                         marginTop: 10,
                         padding: 12,
-                        background: "rgba(60, 242, 176, 0.08)",
-                        border: "1px solid rgba(60, 242, 176, 0.2)",
+                        background: "rgba(232, 132, 94, 0.08)",
+                        border: "1px solid rgba(232, 132, 94, 0.2)",
                         borderRadius: 12,
-                        color: "#d6ffe9",
+                        color: "#ededec",
                         fontSize: 13,
                         display: "flex",
                         gap: 10,

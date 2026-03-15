@@ -30,7 +30,7 @@ export default function NavBar() {
             RepDetect
           </Link>
           {streak > 0 && (
-            <div title={`${streak} day streak!`} style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255, 100, 80, 0.15)", color: "#ff8c6b", padding: "4px 10px", borderRadius: 12, fontSize: 13, fontWeight: 800 }}>
+            <div title={`${streak} day streak!`} style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(232, 132, 94, 0.15)", color: "var(--accent)", padding: "4px 10px", borderRadius: 12, fontSize: 13, fontWeight: 800 }}>
               <span style={{ fontSize: 16 }}>🔥</span> {streak}
             </div>
           )}

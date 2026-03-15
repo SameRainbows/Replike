@@ -10,7 +10,7 @@ export function ExerciseAnimation({ exercise }: { exercise: ExerciseId }) {
             <motion.div
                 animate={{ y: [0, 30, 0] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                style={{ position: "absolute", left: 35, width: 10, height: 10, borderRadius: 5, background: "#3cf2b0" }}
+                style={{ position: "absolute", left: 35, width: 10, height: 10, borderRadius: 5, background: "var(--accent)" }}
             />
             <motion.div
                 animate={{ y: [0, 30, 0], scaleY: [1, 0.5, 1] }}
@@ -37,7 +37,7 @@ export function ExerciseAnimation({ exercise }: { exercise: ExerciseId }) {
             <motion.div
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                style={{ position: "absolute", left: 45, width: 10, height: 10, borderRadius: 5, background: "#3cf2b0" }}
+                style={{ position: "absolute", left: 45, width: 10, height: 10, borderRadius: 5, background: "var(--accent)" }}
             />
             {/* Torso */}
             <motion.div
@@ -79,7 +79,7 @@ export function ExerciseAnimation({ exercise }: { exercise: ExerciseId }) {
                 style={{ position: "absolute", left: 20, top: 0, width: 60, height: 4, background: "rgba(255,255,255,0.7)", transformOrigin: "left center" }}
             >
                 {/* Head */}
-                <div style={{ position: "absolute", right: -15, top: -7, width: 10, height: 10, borderRadius: 5, background: "#3cf2b0" }} />
+                <div style={{ position: "absolute", right: -15, top: -7, width: 10, height: 10, borderRadius: 5, background: "var(--accent)" }} />
             </motion.div>
 
             {/* Arm */}
@@ -96,7 +96,7 @@ export function ExerciseAnimation({ exercise }: { exercise: ExerciseId }) {
             <motion.div
                 animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                style={{ width: 40, height: 40, borderRadius: 20, background: "rgba(60, 242, 176, 0.2)", border: "2px solid #3cf2b0" }}
+                style={{ width: 40, height: 40, borderRadius: 20, background: "rgba(232, 132, 94, 0.2)", border: "2px solid var(--accent)" }}
             />
         </div>
     );
