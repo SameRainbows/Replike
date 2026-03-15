@@ -14,7 +14,7 @@ export function AdvancedNebula() {
   return (
     <div className="nebula-system" aria-hidden="true">
       {/* 1. SVG Definitions for Texture and Noise */}
-      <svg className="nebula-svg" style={{ display: "none" }}>
+      <svg className="nebula-svg" style={{ width: 0, height: 0, position: "absolute" }} aria-hidden="true">
         <defs>
           {/* Fractal noise for displacement (creates the smoky/fluid look) */}
           <filter id="aurora-filter">
@@ -23,9 +23,10 @@ export function AdvancedNebula() {
               baseFrequency="0.015"
               numOctaves="3"
               seed="5"
+              result="noise"
             />
             {/* The scale determines how warped it gets */}
-            <feDisplacementMap in="SourceGraphic" scale="40" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="50" xChannelSelector="R" yChannelSelector="G" />
           </filter>
 
           {/* High-frequency static noise (film grain overlay) */}
@@ -35,12 +36,13 @@ export function AdvancedNebula() {
               baseFrequency="0.8"
               numOctaves="3"
               stitchTiles="stitch"
+              result="noiseOut"
             />
-            <feColorMatrix type="saturate" values="0" />
-            <feComponentTransfer>
+            <feColorMatrix type="saturate" values="0" in="noiseOut" result="noiseDesat" />
+            <feComponentTransfer in="noiseDesat" result="noiseAlpha">
               <feFuncA type="linear" slope="0.5" />
             </feComponentTransfer>
-            <feBlend mode="multiply" in="SourceGraphic" />
+            <feBlend mode="multiply" in="SourceGraphic" in2="noiseAlpha" />
           </filter>
         </defs>
       </svg>

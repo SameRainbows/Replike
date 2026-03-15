@@ -570,8 +570,8 @@ a {
   width: 120%;
   height: 120%;
   /* This is the magic warp filter */
-  filter: url(#aurora-filter) blur(30px);
-  -webkit-filter: url(#aurora-filter) blur(30px);
+  filter: url(#aurora-filter);
+  -webkit-filter: url(#aurora-filter);
   opacity: 0.8;
   transform: translateZ(0); /* Hardware acceleration */
 }
@@ -589,7 +589,7 @@ a {
   left: 10%;
   width: 80%;
   height: 80%;
-  background: var(--accent);
+  background: radial-gradient(ellipse at center, var(--accent) 0%, transparent 70%);
   opacity: 0.45;
   animation: aurora-pan-1 12s ease-in-out infinite alternate;
 }
@@ -600,7 +600,7 @@ a {
   right: 15%;
   width: 60%;
   height: 60%;
-  background: var(--accent-2);
+  background: radial-gradient(ellipse at center, var(--accent-2) 0%, transparent 70%);
   opacity: 0.35;
   animation: aurora-pan-2 15s ease-in-out infinite alternate;
 }
@@ -611,7 +611,7 @@ a {
   left: 30%;
   width: 90%;
   height: 70%;
-  background: #c84020;
+  background: radial-gradient(ellipse at center, #c84020 0%, transparent 70%);
   opacity: 0.3;
   animation: aurora-pan-3 10s ease-in-out infinite alternate;
 }
@@ -622,7 +622,7 @@ a {
   left: 40%;
   width: 30%;
   height: 40%;
-  background: #ffc480;
+  background: radial-gradient(ellipse at center, #ffc480 0%, transparent 70%);
   opacity: 0.25;
   animation: aurora-pulse 8s ease-in-out infinite alternate;
   mix-blend-mode: overlay;
