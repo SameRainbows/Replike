@@ -113,6 +113,8 @@ a {
 .app__main {
   flex: 1;
   padding: 24px 0 32px;
+  position: relative;
+  z-index: 1;
 }
 
 .page {
