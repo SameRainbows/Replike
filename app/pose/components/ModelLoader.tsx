@@ -18,76 +18,107 @@ export function ModelLoader() {
       }}
     >
       <div style={{ position: "relative", width: 80, height: 80 }}>
-        {/* AI Breathing Orb - Outer Aura */}
+        {/* Pulsing Background Aura */}
         <motion.div
           animate={{
-            rotate: 360,
-            scale: [1, 1.1, 1],
+            scale: [1, 1.4, 1],
+            opacity: [0.15, 0, 0.15],
           }}
           transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          style={{
-            position: "absolute",
-            inset: "-20%",
-            borderRadius: "50%",
-            background: "radial-gradient(circle at center, rgba(60, 242, 176, 0.15) 0%, transparent 70%)",
-            filter: "blur(12px)",
-          }}
-        />
-
-        {/* AI Breathing Orb - Middle Layer */}
-        <motion.div
-          animate={{
-            rotate: -360,
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 6,
+            duration: 1.5,
             repeat: Infinity,
             ease: "easeInOut",
           }}
           style={{
             position: "absolute",
-            top: "-10%",
-            left: "-10%",
-            right: "10%",
-            bottom: "10%",
+            inset: 0,
             borderRadius: "50%",
-            background: "radial-gradient(circle at top right, rgba(84, 126, 255, 0.4) 0%, transparent 60%)",
+            background: "var(--accent)",
             filter: "blur(8px)",
           }}
         />
 
-        {/* AI Breathing Orb - Core */}
+        {/* Top Joint (Shoulder/Hip) */}
+        <div 
+          style={{ 
+            position: "absolute", 
+            left: "calc(50% - 6px)", 
+            top: 16, 
+            width: 12, 
+            height: 12, 
+            borderRadius: "50%", 
+            background: "var(--accent-2)", 
+            zIndex: 2,
+            boxShadow: "0 0 10px var(--accent-2)"
+          }} 
+        />
+        
+        {/* Top Bone (Bicep/Thigh) */}
+        <div 
+          style={{ 
+            position: "absolute", 
+            left: "calc(50% - 3px)", 
+            top: 22, 
+            width: 6, 
+            height: 30, 
+            background: "rgba(255,255,255,0.8)", 
+            borderRadius: 3 
+          }} 
+        />
+        
+        {/* Middle Joint (Elbow/Knee) */}
         <motion.div
-          animate={{
-            scale: [1, 1.05, 1],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          style={{ 
+            position: "absolute", 
+            left: "calc(50% - 6px)", 
+            top: 48, 
+            width: 12, 
+            height: 12, 
+            borderRadius: "50%", 
+            background: "var(--accent)", 
+            zIndex: 2, 
+            boxShadow: "0 0 15px var(--accent)" 
+          }} 
+        />
+        
+        {/* Bottom Bone & Joint Group (Forearm/Calf) */}
+        <motion.div
+          animate={{ rotate: [10, -110, 10] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           style={{
             position: "absolute",
-            top: "25%",
-            left: "25%",
-            right: "25%",
-            bottom: "25%",
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, var(--accent), var(--accent-2))",
-            boxShadow: "0 0 20px rgba(60, 242, 176, 0.5), 0 0 40px rgba(84, 126, 255, 0.3)",
+            left: "calc(50% - 3px)",
+            top: 54,
+            width: 6,
+            height: 30,
+            background: "rgba(255,255,255,0.8)",
+            borderRadius: 3,
+            transformOrigin: "top center",
           }}
-        />
+        >
+          {/* Bottom Joint (Wrist/Ankle) */}
+          <div 
+            style={{ 
+              position: "absolute", 
+              left: -3, 
+              bottom: -4, 
+              width: 12, 
+              height: 12, 
+              borderRadius: "50%", 
+              background: "var(--accent-2)", 
+              zIndex: 2,
+              boxShadow: "0 0 10px var(--accent-2)"
+            }} 
+          />
+        </motion.div>
       </div>
 
       <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
-        <h3 className="h3">Preparing your workspace</h3>
-        <p className="muted" style={{ maxWidth: 280, margin: "0 auto", fontSize: 13 }}>
-          Loading the AI fitness coach and securing your local camera feed. This usually takes just a few seconds.
+        <h3 className="h3">Setting up your workout</h3>
+        <p className="muted" style={{ maxWidth: 280, margin: "0 auto", fontSize: 13, lineHeight: 1.5 }}>
+          Gearing up the local AI coach. Your camera feed stays entirely on your device for total privacy.
         </p>
       </div>
     </div>
