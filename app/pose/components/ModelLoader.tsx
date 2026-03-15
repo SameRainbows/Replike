@@ -18,11 +18,53 @@ export function ModelLoader() {
       }}
     >
       <div style={{ position: "relative", width: 80, height: 80 }}>
-        {/* Pulsing ring */}
+        {/* AI Breathing Orb - Outer Aura */}
         <motion.div
           animate={{
-            scale: [1, 1.5, 1],
-            opacity: [0.6, 0, 0.6],
+            rotate: 360,
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          style={{
+            position: "absolute",
+            inset: "-20%",
+            borderRadius: "50%",
+            background: "radial-gradient(circle at center, rgba(60, 242, 176, 0.15) 0%, transparent 70%)",
+            filter: "blur(12px)",
+          }}
+        />
+
+        {/* AI Breathing Orb - Middle Layer */}
+        <motion.div
+          animate={{
+            rotate: -360,
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{
+            position: "absolute",
+            top: "-10%",
+            left: "-10%",
+            right: "10%",
+            bottom: "10%",
+            borderRadius: "50%",
+            background: "radial-gradient(circle at top right, rgba(84, 126, 255, 0.4) 0%, transparent 60%)",
+            filter: "blur(8px)",
+          }}
+        />
+
+        {/* AI Breathing Orb - Core */}
+        <motion.div
+          animate={{
+            scale: [1, 1.05, 1],
           }}
           transition={{
             duration: 2,
@@ -31,61 +73,21 @@ export function ModelLoader() {
           }}
           style={{
             position: "absolute",
-            inset: 0,
+            top: "25%",
+            left: "25%",
+            right: "25%",
+            bottom: "25%",
             borderRadius: "50%",
-            border: "2px solid var(--accent)",
-          }}
-        />
-
-        {/* Center dot */}
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            background: "var(--accent)",
-            boxShadow: "0 0 20px rgba(60, 242, 176, 0.8)",
-          }}
-        />
-
-        {/* Scanning line */}
-        <motion.div
-          animate={{
-            y: [0, 80, 0],
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: "-10%",
-            width: "120%",
-            height: 2,
-            background: "rgba(60, 242, 176, 0.8)",
-            boxShadow: "0 0 10px rgba(60, 242, 176, 0.8)",
+            background: "linear-gradient(135deg, var(--accent), var(--accent-2))",
+            boxShadow: "0 0 20px rgba(60, 242, 176, 0.5), 0 0 40px rgba(84, 126, 255, 0.3)",
           }}
         />
       </div>
 
       <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
-        <h3 className="h3">Warming up Vision AI</h3>
+        <h3 className="h3">Preparing your workspace</h3>
         <p className="muted" style={{ maxWidth: 280, margin: "0 auto", fontSize: 13 }}>
-          Downloading the tracking model and activating your camera. This usually takes just a few seconds.
+          Loading the AI fitness coach and securing your local camera feed. This usually takes just a few seconds.
         </p>
       </div>
     </div>
