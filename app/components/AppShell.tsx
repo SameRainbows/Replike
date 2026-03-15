@@ -1,6 +1,7 @@
 import NavBar from "@/app/components/NavBar";
 import { OnboardingModal } from "@/app/components/OnboardingModal";
 import { ThemeProvider } from "@/app/components/ThemeProvider";
+import { AdvancedNebula } from "@/app/components/AdvancedNebula";
 
 export default function AppShell({
   children,
@@ -21,12 +22,7 @@ export default function AppShell({
         </div>
       </footer>
       <OnboardingModal />
-      {/* Animated nebula background glow */}
-      <div className="nebula" aria-hidden="true">
-        <div className="nebula__layer nebula__layer--1" />
-        <div className="nebula__layer nebula__layer--2" />
-        <div className="nebula__layer nebula__layer--3" />
-      </div>
+      <AdvancedNebula />
     </div>
   );
 }

@@ -547,83 +547,138 @@ a {
 }
 
 /* ==========================================================================
-   NEBULA BACKGROUND GLOW
+   ADVANCED NEBULA (SVG DISPLACEMENT + NOISE)
    ========================================================================== */
 
-.nebula {
+.nebula-system {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 45vh;
+  height: 60vh;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to top, black 10%, transparent 90%);
-  mask-image: linear-gradient(to top, black 10%, transparent 90%);
+  /* Hard fade out at top */
+  -webkit-mask-image: linear-gradient(to top, black 5%, transparent 95%);
+  mask-image: linear-gradient(to top, black 5%, transparent 95%);
 }
 
-.nebula__layer {
+.nebula-canvas {
   position: absolute;
-  bottom: -20%;
+  inset: -10%;
   width: 120%;
-  height: 100%;
+  height: 120%;
+  /* This is the magic warp filter */
+  filter: url(#aurora-filter) blur(30px);
+  -webkit-filter: url(#aurora-filter) blur(30px);
+  opacity: 0.8;
+  transform: translateZ(0); /* Hardware acceleration */
+}
+
+/* Base shape for the moving lights */
+.nebula-blob {
+  position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
+  mix-blend-mode: screen;
+}
+
+/* Layer 1: Coral base */
+.nebula-blob--coral {
+  bottom: -20%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
+  background: var(--accent);
+  opacity: 0.45;
+  animation: aurora-pan-1 12s ease-in-out infinite alternate;
+}
+
+/* Layer 2: Amber middle */
+.nebula-blob--amber {
+  bottom: -10%;
+  right: 15%;
+  width: 60%;
+  height: 60%;
+  background: var(--accent-2);
+  opacity: 0.35;
+  animation: aurora-pan-2 15s ease-in-out infinite alternate;
+}
+
+/* Layer 3: Deep red roots */
+.nebula-blob--deep {
+  bottom: -30%;
+  left: 30%;
+  width: 90%;
+  height: 70%;
+  background: #c84020;
+  opacity: 0.3;
+  animation: aurora-pan-3 10s ease-in-out infinite alternate;
+}
+
+/* Layer 4: Bright hot spot highlight */
+.nebula-blob--highlight {
+  bottom: 0%;
+  left: 40%;
+  width: 30%;
+  height: 40%;
+  background: #ffc480;
+  opacity: 0.25;
+  animation: aurora-pulse 8s ease-in-out infinite alternate;
+  mix-blend-mode: overlay;
+}
+
+/* Film grain overlay */
+.nebula-grain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Apply the grain filter to a simple white background */
+  background: white;
+  filter: url(#grain-filter);
+  mix-blend-mode: overlay;
+  opacity: 0.25;
+}
+
+/* Light Theme overrides for the new nebula */
+[data-theme="light"] .nebula-canvas {
+  opacity: 0.6;
+}
+[data-theme="light"] .nebula-blob {
+  mix-blend-mode: multiply; /* Better blending for light mode */
+}
+[data-theme="light"] .nebula-blob--highlight {
+  mix-blend-mode: soft-light;
+}
+[data-theme="light"] .nebula-grain {
+  mix-blend-mode: soft-light;
   opacity: 0.4;
 }
 
-.nebula__layer--1 {
-  left: -10%;
-  background: radial-gradient(ellipse at 30% 80%, rgba(232, 132, 94, 0.35), transparent 65%);
-  animation: nebulaFloat1 8s ease-in-out infinite alternate;
+/* Organic motion keyframes */
+@keyframes aurora-pan-1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate(15%, -5%) scale(1.1) rotate(2deg); }
 }
 
-.nebula__layer--2 {
-  left: 20%;
-  background: radial-gradient(ellipse at 60% 70%, rgba(240, 179, 102, 0.25), transparent 60%);
-  animation: nebulaFloat2 10s ease-in-out infinite alternate;
+@keyframes aurora-pan-2 {
+  0% { transform: translate(0, 5%) scale(1.1) rotate(0deg); }
+  100% { transform: translate(-15%, -10%) scale(0.9) rotate(-3deg); }
 }
 
-.nebula__layer--3 {
-  left: -5%;
-  background: radial-gradient(ellipse at 70% 90%, rgba(200, 80, 50, 0.20), transparent 55%);
-  animation: nebulaFloat3 12s ease-in-out infinite alternate;
+@keyframes aurora-pan-3 {
+  0% { transform: translate(-10%, 0) scale(1) rotate(-2deg); }
+  100% { transform: translate(10%, 10%) scale(1.05) rotate(1deg); }
 }
 
-[data-theme="light"] .nebula__layer--1 {
-  background: radial-gradient(ellipse at 30% 80%, rgba(201, 106, 66, 0.18), transparent 65%);
-}
-
-[data-theme="light"] .nebula__layer--2 {
-  background: radial-gradient(ellipse at 60% 70%, rgba(212, 147, 64, 0.12), transparent 60%);
-}
-
-[data-theme="light"] .nebula__layer--3 {
-  background: radial-gradient(ellipse at 70% 90%, rgba(180, 70, 40, 0.10), transparent 55%);
-}
-
-[data-theme="light"] .nebula__layer {
-  opacity: 0.5;
-}
-
-@keyframes nebulaFloat1 {
-  0% { transform: translateX(0) scale(1); }
-  100% { transform: translateX(8%) scale(1.1); }
-}
-
-@keyframes nebulaFloat2 {
-  0% { transform: translateX(0) scale(1.05); }
-  100% { transform: translateX(-6%) scale(0.95); }
-}
-
-@keyframes nebulaFloat3 {
-  0% { transform: translateX(-3%) scale(1); }
-  100% { transform: translateX(5%) scale(1.08); }
+@keyframes aurora-pulse {
+  0% { transform: translate(-20%, 5%) scale(1); opacity: 0.15; }
+  100% { transform: translate(20%, -5%) scale(1.4); opacity: 0.35; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nebula__layer {
+  .nebula-blob {
     animation: none !important;
   }
 }
