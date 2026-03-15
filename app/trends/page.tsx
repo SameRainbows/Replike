@@ -5,7 +5,6 @@ import { loadSessions, type WorkoutSession } from "@/app/lib/workoutHistory";
 import { EXERCISE_LABELS } from "@/app/pose/exercises/types";
 import { generateCoachInsight } from "@/app/lib/coach";
 import { calculateStreak } from "@/app/lib/streaks";
-import { DailyLog } from "./components/DailyLog";
 
 export default function TrendsPage() {
     const [sessions, setSessions] = useState<WorkoutSession[]>([]);
@@ -105,9 +104,6 @@ export default function TrendsPage() {
                     </div>
                 </div>
             </div>
-
-            <DailyLog />
-
             {sessions.length === 0 ? (
                 <div className="card">
                     <div className="muted" style={{ fontSize: 14 }}>

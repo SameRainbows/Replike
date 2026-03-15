@@ -66,19 +66,6 @@ export function generateCoachInsight(sessions: WorkoutSession[]): string {
         }
     }
 
-    // Goal-specific defaults
-    if (profile.metrics && profile.metrics.length > 0) {
-        const lastSleep = profile.metrics[profile.metrics.length - 1].sleepHours;
-        const lastWater = profile.metrics[profile.metrics.length - 1].waterGlasses;
-
-        if (lastSleep < 6) {
-            return `Coach noticed you only slept ${lastSleep} hours. Lack of sleep heavily degrades form and increases injury risk. Take it very easy today.`;
-        }
-        if (lastWater < 4) {
-            return `You logged ${lastWater} glasses of water. Hydration is key to muscle function. Drink up before you work out!`;
-        }
-    }
-
     if (profile.level === "advanced") {
         return "You're consistently putting in the work. Coach thinks you're ready for the hard variations. Keep pushing the intensity.";
     } else if (profile.level === "beginner") {
