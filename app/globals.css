@@ -31,20 +31,21 @@ body {
 }
 
 [data-theme="light"] {
-  --bg0: #fafaf9;
-  --bg1: #f0eeeb;
+  --bg0: #faf8f5;
+  --bg1: #f0ece6;
   --surface: rgba(255, 255, 255, 0.85);
   --surface-2: rgba(255, 255, 255, 0.6);
-  --border: rgba(0, 0, 0, 0.08);
-  --border-2: rgba(0, 0, 0, 0.12);
-  --text: #1a1a1a;
-  --muted: #5a5a5a;
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --border: rgba(140, 110, 80, 0.10);
+  --border-2: rgba(140, 110, 80, 0.16);
+  --text: #1a1613;
+  --muted: #6b5e52;
 
   --accent: #c96a42;
   --accent-2: #d49340;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 18px 44px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 3px rgba(120, 80, 40, 0.08), 0 10px 28px rgba(120, 80, 40, 0.04);
+  --shadow-md: 0 4px 6px rgba(120, 80, 40, 0.08), 0 18px 44px rgba(120, 80, 40, 0.06);
 }
 
 .split {
@@ -62,8 +63,7 @@ body {
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
     Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(900px 500px at 50% 100%, rgba(232, 132, 94, 0.06), transparent 70%),
-    var(--bg0);
+  background: var(--bg0);
   background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -129,6 +129,10 @@ a {
   border-bottom: 1px solid var(--border);
 }
 
+[data-theme="light"] .nav {
+  background: rgba(250, 248, 245, 0.78);
+}
+
 .nav__inner {
   height: 60px;
   display: flex;
@@ -153,13 +157,18 @@ a {
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid transparent;
-  color: rgba(230, 237, 246, 0.9);
+  color: var(--muted);
   transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
 
 .nav__link:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .nav__link:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.06);
 }
 
 .nav__link:active {
@@ -175,6 +184,8 @@ a {
 .footer {
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
+  position: relative;
+  z-index: 1;
 }
 
 .footer__inner {
@@ -427,6 +438,10 @@ a {
   backdrop-filter: blur(10px);
 }
 
+[data-theme="light"] .modalCard {
+  background: rgba(255, 255, 255, 0.92);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .modalBackdrop {
     animation: modalFadeIn 180ms var(--ease-out) both;
@@ -529,4 +544,86 @@ a {
   transform: translateY(-4px) scale(1.02);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
   background: var(--surface-hover);
+}
+
+/* ==========================================================================
+   NEBULA BACKGROUND GLOW
+   ========================================================================== */
+
+.nebula {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45vh;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to top, black 10%, transparent 90%);
+  mask-image: linear-gradient(to top, black 10%, transparent 90%);
+}
+
+.nebula__layer {
+  position: absolute;
+  bottom: -20%;
+  width: 120%;
+  height: 100%;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+}
+
+.nebula__layer--1 {
+  left: -10%;
+  background: radial-gradient(ellipse at 30% 80%, rgba(232, 132, 94, 0.35), transparent 65%);
+  animation: nebulaFloat1 8s ease-in-out infinite alternate;
+}
+
+.nebula__layer--2 {
+  left: 20%;
+  background: radial-gradient(ellipse at 60% 70%, rgba(240, 179, 102, 0.25), transparent 60%);
+  animation: nebulaFloat2 10s ease-in-out infinite alternate;
+}
+
+.nebula__layer--3 {
+  left: -5%;
+  background: radial-gradient(ellipse at 70% 90%, rgba(200, 80, 50, 0.20), transparent 55%);
+  animation: nebulaFloat3 12s ease-in-out infinite alternate;
+}
+
+[data-theme="light"] .nebula__layer--1 {
+  background: radial-gradient(ellipse at 30% 80%, rgba(201, 106, 66, 0.18), transparent 65%);
+}
+
+[data-theme="light"] .nebula__layer--2 {
+  background: radial-gradient(ellipse at 60% 70%, rgba(212, 147, 64, 0.12), transparent 60%);
+}
+
+[data-theme="light"] .nebula__layer--3 {
+  background: radial-gradient(ellipse at 70% 90%, rgba(180, 70, 40, 0.10), transparent 55%);
+}
+
+[data-theme="light"] .nebula__layer {
+  opacity: 0.5;
+}
+
+@keyframes nebulaFloat1 {
+  0% { transform: translateX(0) scale(1); }
+  100% { transform: translateX(8%) scale(1.1); }
+}
+
+@keyframes nebulaFloat2 {
+  0% { transform: translateX(0) scale(1.05); }
+  100% { transform: translateX(-6%) scale(0.95); }
+}
+
+@keyframes nebulaFloat3 {
+  0% { transform: translateX(-3%) scale(1); }
+  100% { transform: translateX(5%) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nebula__layer {
+    animation: none !important;
+  }
 }

@@ -21,6 +21,12 @@ export default function AppShell({
         </div>
       </footer>
       <OnboardingModal />
+      {/* Animated nebula background glow */}
+      <div className="nebula" aria-hidden="true">
+        <div className="nebula__layer nebula__layer--1" />
+        <div className="nebula__layer nebula__layer--2" />
+        <div className="nebula__layer nebula__layer--3" />
+      </div>
     </div>
   );
 }
