@@ -305,6 +305,26 @@ a {
   background: rgba(232, 132, 94, 0.20);
 }
 
+[data-theme="light"] .btn {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .btn--primary {
+  border-color: rgba(232, 132, 94, 0.4);
+  background: rgba(232, 132, 94, 0.15);
+  color: var(--text);
+}
+
+[data-theme="light"] .btn--primary:hover {
+  background: rgba(232, 132, 94, 0.25);
+}
+
 .grid {
   display: grid;
   gap: 12px;

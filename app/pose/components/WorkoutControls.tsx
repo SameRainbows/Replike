@@ -67,14 +67,14 @@ export function WorkoutControls({
             <div style={{ display: "grid", gap: 16 }}>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
                     <div style={{ display: "grid", gap: 4 }}>
-                        <label style={{ fontSize: 12, color: "#a7b4c7" }}>Mode</label>
+                        <label style={{ fontSize: 12, color: "var(--muted)" }}>Mode</label>
                         <select
                             value={planMode}
                             onChange={(e) => onPlanModeChange(e.target.value as PlanMode)}
                             style={{
-                                background: "rgba(255,255,255,0.06)",
-                                color: "#e6edf6",
-                                border: "1px solid rgba(255,255,255,0.12)",
+                                background: "var(--surface)",
+                                color: "var(--text)",
+                                border: "1px solid var(--border)",
                                 borderRadius: 10,
                                 padding: "10px 12px",
                                 fontSize: 16,
@@ -84,13 +84,13 @@ export function WorkoutControls({
                                 minWidth: 140,
                             }}
                         >
-                            <option value="free" style={{ background: "#0e111a", color: "#e6edf6" }}>
+                            <option value="free" style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                 Free workout
                             </option>
-                            <option value="plan" style={{ background: "#0e111a", color: "#e6edf6" }}>
+                            <option value="plan" style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                 Guided plan
                             </option>
-                            <option value="custom" style={{ background: "#0e111a", color: "#e6edf6" }}>
+                            <option value="custom" style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                 Custom build
                             </option>
                         </select>
@@ -99,7 +99,7 @@ export function WorkoutControls({
                     {planMode === "free" && (
                         <div style={{ display: "grid", gap: 4 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <label style={{ fontSize: 12, color: "#a7b4c7" }}>Exercise</label>
+                                <label style={{ fontSize: 12, color: "var(--muted)" }}>Exercise</label>
                                 <button
                                     type="button"
                                     onClick={() => setDemoOpen(true)}
@@ -120,9 +120,9 @@ export function WorkoutControls({
                                 value={exercise}
                                 onChange={(e) => onExerciseChange(e.target.value as ExerciseId)}
                                 style={{
-                                    background: "rgba(255,255,255,0.06)",
-                                    color: "#e6edf6",
-                                    border: "1px solid rgba(255,255,255,0.12)",
+                                    background: "var(--surface)",
+                                    color: "var(--text)",
+                                    border: "1px solid var(--border)",
                                     borderRadius: 10,
                                     padding: "10px 12px",
                                     fontSize: 16,
@@ -133,7 +133,7 @@ export function WorkoutControls({
                                 }}
                             >
                                 {ALL_EXERCISE_IDS.map((id) => (
-                                    <option key={id} value={id} style={{ background: "#0e111a", color: "#e6edf6" }}>
+                                    <option key={id} value={id} style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                         {EXERCISE_LABELS[id]}
                                     </option>
                                 ))}
@@ -144,7 +144,7 @@ export function WorkoutControls({
                     {planMode === "custom" && (
                         <div style={{ display: "grid", gap: 4 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <label style={{ fontSize: 12, color: "#a7b4c7" }}>Select workout</label>
+                                <label style={{ fontSize: 12, color: "var(--muted)" }}>Select workout</label>
                                 {activeCustomWorkout && (
                                     <button
                                         type="button"
@@ -174,9 +174,9 @@ export function WorkoutControls({
                                 value={activeCustomWorkout?.id || ""}
                                 onChange={(e) => onCustomWorkoutSelect(e.target.value)}
                                 style={{
-                                    background: "rgba(255,255,255,0.06)",
-                                    color: "#e6edf6",
-                                    border: "1px solid rgba(255,255,255,0.12)",
+                                    background: "var(--surface)",
+                                    color: "var(--text)",
+                                    border: "1px solid var(--border)",
                                     borderRadius: 10,
                                     padding: "10px 12px",
                                     fontSize: 16,
@@ -187,16 +187,16 @@ export function WorkoutControls({
                                 }}
                             >
                                 {customWorkouts.length === 0 ? (
-                                    <option value="" disabled style={{ background: "#0e111a", color: "#e6edf6" }}>
+                                    <option value="" disabled style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                         No workouts (Go to Builder)
                                     </option>
                                 ) : (
                                     <>
-                                        <option value="" disabled style={{ background: "#0e111a", color: "#e6edf6" }}>
+                                        <option value="" disabled style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                             Choose...
                                         </option>
                                         {customWorkouts.map((w) => (
-                                            <option key={w.id} value={w.id} style={{ background: "#0e111a", color: "#e6edf6" }}>
+                                            <option key={w.id} value={w.id} style={{ background: "var(--bg0)", color: "var(--text)" }}>
                                                 {w.name}
                                             </option>
                                         ))}
@@ -209,18 +209,15 @@ export function WorkoutControls({
                     {status !== "init" && status !== "error" && (
                         <button
                             type="button"
+                            className={`btn ${!sessionRunning ? "btn--primary" : ""}`}
                             onClick={onSessionToggle}
                             style={{
-                                background: sessionRunning ? "rgba(255, 180, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
-                                color: sessionRunning ? "#ffd8a8" : "#e6edf6",
-                                border: sessionRunning
-                                    ? "1px solid rgba(255, 180, 80, 0.28)"
-                                    : "1px solid rgba(232, 132, 94, 0.35)",
-                                borderRadius: 10,
-                                padding: "10px 12px",
-                                fontSize: 14,
-                                cursor: "pointer",
                                 alignSelf: "end",
+                                ...(sessionRunning ? {
+                                    background: "rgba(255, 180, 80, 0.12)",
+                                    borderColor: "rgba(255, 180, 80, 0.28)",
+                                    color: "var(--accent-2)"
+                                } : {})
                             }}
                         >
                             {sessionRunning ? "Pause" : hasStarted ? "Resume" : "Start Workout"}
@@ -229,17 +226,9 @@ export function WorkoutControls({
 
                     <button
                         type="button"
+                        className="btn"
                         onClick={onSetupClick}
-                        style={{
-                            background: "rgba(255,255,255,0.06)",
-                            color: "#e6edf6",
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            fontSize: 14,
-                            cursor: "pointer",
-                            alignSelf: "end",
-                        }}
+                        style={{ alignSelf: "end" }}
                     >
                         Setup
                     </button>
@@ -247,19 +236,15 @@ export function WorkoutControls({
                     {planMode === "plan" && (
                         <button
                             type="button"
+                            className={`btn ${!planStateActive ? "btn--primary" : ""}`}
                             onClick={onPlanStartStop}
                             style={{
-                                background: planStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
-                                color: "#e6edf6",
-                                border: planStateActive
-                                    ? "1px solid rgba(255, 80, 80, 0.28)"
-                                    : "1px solid rgba(232, 132, 94, 0.35)",
-                                borderRadius: 10,
-                                padding: "10px 12px",
-                                fontSize: 14,
-                                cursor: "pointer",
                                 alignSelf: "end",
-                                fontWeight: 800,
+                                ...(planStateActive ? {
+                                    background: "rgba(255, 80, 80, 0.12)",
+                                    borderColor: "rgba(255, 80, 80, 0.28)",
+                                    color: "#f56565"
+                                } : {})
                             }}
                         >
                             {planStateActive ? "Stop plan" : "Start plan"}
@@ -269,19 +254,15 @@ export function WorkoutControls({
                     {planMode === "custom" && (
                         <button
                             type="button"
+                            className={`btn ${!customStateActive ? "btn--primary" : ""}`}
                             onClick={onCustomStartStop}
                             style={{
-                                background: customStateActive ? "rgba(255, 80, 80, 0.12)" : "rgba(232, 132, 94, 0.14)",
-                                color: "#e6edf6",
-                                border: customStateActive
-                                    ? "1px solid rgba(255, 80, 80, 0.28)"
-                                    : "1px solid rgba(232, 132, 94, 0.35)",
-                                borderRadius: 10,
-                                padding: "10px 12px",
-                                fontSize: 14,
-                                cursor: "pointer",
                                 alignSelf: "end",
-                                fontWeight: 800,
+                                ...(customStateActive ? {
+                                    background: "rgba(255, 80, 80, 0.12)",
+                                    borderColor: "rgba(255, 80, 80, 0.28)",
+                                    color: "#f56565"
+                                } : {})
                             }}
                         >
                             {customStateActive ? "Stop workout" : "Start workout"}
@@ -290,17 +271,9 @@ export function WorkoutControls({
 
                     <button
                         type="button"
+                        className="btn"
                         onClick={onReset}
-                        style={{
-                            background: "rgba(255,255,255,0.06)",
-                            color: "#e6edf6",
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            fontSize: 14,
-                            cursor: "pointer",
-                            alignSelf: "end",
-                        }}
+                        style={{ alignSelf: "end" }}
                     >
                         Reset
                     </button>
@@ -308,18 +281,9 @@ export function WorkoutControls({
                     {planMode === "free" && (
                         <button
                             type="button"
+                            className="btn btn--primary"
                             onClick={onSaveSession}
-                            style={{
-                                background: "rgba(232, 132, 94, 0.14)",
-                                color: "#e6edf6",
-                                border: "1px solid rgba(232, 132, 94, 0.35)",
-                                borderRadius: 10,
-                                padding: "10px 12px",
-                                fontSize: 14,
-                                cursor: "pointer",
-                                alignSelf: "end",
-                                fontWeight: 800,
-                            }}
+                            style={{ alignSelf: "end" }}
                         >
                             Save session
                         </button>
@@ -330,18 +294,18 @@ export function WorkoutControls({
             <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: 18 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                        <div style={{ fontSize: 12, color: "#a7b4c7" }}>Reps</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Reps</div>
                         <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.2 }}>
                             {repCount}
                         </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                        <div style={{ fontSize: 12, color: "#a7b4c7" }}>Phase</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Phase</div>
                         <div style={{ fontSize: 16, fontWeight: 700 }}>{displayPhase}</div>
                     </div>
                 </div>
 
-                <div style={{ fontSize: 12, color: "#a7b4c7" }}>Status: {status}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>Status: {status}</div>
             </div>
         </div>
     );
