@@ -223,10 +223,7 @@ a {
   font-size: 44px;
   letter-spacing: -1px;
   line-height: 1.05;
-  background: linear-gradient(90deg, rgba(230, 237, 246, 0.98), rgba(84, 126, 255, 0.92), rgba(60, 242, 176, 0.92));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
 }
 
 .hero__subtitle {

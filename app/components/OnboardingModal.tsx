@@ -41,7 +41,7 @@ export function OnboardingModal() {
                         <div className="stack" style={{ gap: 24, padding: "10px 0" }}>
                             <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
                                 <h2 className="h2" style={{ fontSize: 28 }}>Welcome to RepDetect</h2>
-                                <div className="muted">Your private AI fitness coach. Let's get to know you so we can personalize your coaching.</div>
+                                <div className="muted">Let's set up your profile so we can tailor the experience to you.</div>
                             </div>
 
                             <div className="stack" style={{ gap: 12 }}>
@@ -85,7 +85,7 @@ export function OnboardingModal() {
                         <div className="stack" style={{ gap: 24, padding: "10px 0" }}>
                             <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
                                 <h2 className="h2" style={{ fontSize: 28 }}>Experience Level</h2>
-                                <div className="muted">This helps the AI recommend the right starting plans and adjust form expectations.</div>
+                                <div className="muted">This helps us match the right difficulty and feedback to your level.</div>
                             </div>
 
                             <div className="stack" style={{ gap: 12 }}>
@@ -93,9 +93,9 @@ export function OnboardingModal() {
 
                                 {(
                                     [
-                                        { id: "beginner", label: "Seedling (Rarely to Never)", sub: "AI will focus on forming safe habits." },
-                                        { id: "intermediate", label: "Active (1-3 times a week)", sub: "AI will push you to be consistent." },
-                                        { id: "advanced", label: "Athlete (4+ times a week)", sub: "AI expects tight form and high rep volume." }
+                                        { id: "beginner", label: "Seedling (Rarely to Never)", sub: "We'll start slow and focus on good form." },
+                                        { id: "intermediate", label: "Active (1-3 times a week)", sub: "You'll get nudges to stay on track." },
+                                        { id: "advanced", label: "Athlete (4+ times a week)", sub: "Strict form tracking and higher targets." }
                                     ] as const
                                 ).map((l) => (
                                     <button

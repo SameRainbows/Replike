@@ -40,12 +40,12 @@ export default function HomePage() {
         </motion.div>
 
         <motion.h1 variants={itemVariants} className="hero__title" style={{ fontSize: "clamp(2.5rem, 6vw, 4.5rem)", lineHeight: 1.1 }}>
-          Your AI Coach, <br /> built into the web.
+          Count reps. Fix form. <br /> No app needed.
         </motion.h1>
 
         <motion.p variants={itemVariants} className="hero__subtitle" style={{ maxWidth: 600, margin: "0 auto 32px auto", fontSize: "1.1rem" }}>
-          RepDetect uses your device's camera to analyze form, count reps, and keep you safe.
-          Zero downloads. Zero data uploads.
+          RepDetect watches your form through your camera and counts every rep — all
+          inside your browser. Nothing is uploaded, ever.
         </motion.p>
 
         <motion.div variants={itemVariants} className="hero__actions" style={{ justifyContent: "center", display: "flex", gap: 16 }}>
@@ -120,18 +120,18 @@ export default function HomePage() {
         <div className="card stack sleek-hover">
           <div className="card__title">Live rep counting</div>
           <div className="muted">
-            Counts reps using spatial pose estimation with anti-cheat hysteresis rules.
+            Tracks your reps automatically so you can focus on the workout, not the count.
           </div>
         </div>
         <div className="card stack sleek-hover">
-          <div className="card__title">Real-time Form cues</div>
+          <div className="card__title">Real-time form cues</div>
           <div className="muted">
-            On-screen AI coaching helps you hit full range-of-motion seamlessly.
+            Tells you when your form is off before a bad habit sticks.
           </div>
         </div>
         <div className="card stack sleek-hover">
-          <div className="card__title">100% Privacy-first</div>
-          <div className="muted">No video uploads. No cloud. Local WebAssembly processing.</div>
+          <div className="card__title">100% private</div>
+          <div className="muted">Your camera feed never leaves your device. Not even a single frame.</div>
         </div>
       </motion.div>
 
@@ -166,7 +166,7 @@ export default function HomePage() {
             <p className="p">Optimized for bedrooms, home gyms, and living rooms.</p>
             <p className="p">Featuring Hands-Free Auto-Calibration to instantly adapt to your height and camera distance without touching the screen.</p>
           </div>
-          <Link href="/about" className="btn" style={{ alignSelf: "flex-start", marginTop: 16 }}>Read the whitepaper</Link>
+          <Link href="/about" className="btn" style={{ alignSelf: "flex-start", marginTop: 16 }}>Learn more</Link>
         </div>
       </motion.div>
     </section>
