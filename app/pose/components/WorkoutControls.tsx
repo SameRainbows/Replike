@@ -292,19 +292,6 @@ export function WorkoutControls({
             </div>
 
             <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: 18 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Reps</div>
-                        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.2 }}>
-                            {repCount}
-                        </div>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Phase</div>
-                        <div style={{ fontSize: 16, fontWeight: 700 }}>{displayPhase}</div>
-                    </div>
-                </div>
-
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>Status: {status}</div>
             </div>
         </div>

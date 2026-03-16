@@ -432,6 +432,8 @@ export default function PoseRepCounter() {
           calibrationEnabled={settings.calibrationEnabled}
           autoCalibHint={calibRest.autoCalibHint}
           autoCalibStableMs={calibRest.autoCalib.stableMs}
+          repCount={repState.repCount}
+          displayPhase={repState.phase === "unknown" ? "---" : repState.phase.toUpperCase()}
         />
       </div>
 

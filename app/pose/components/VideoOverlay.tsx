@@ -7,6 +7,8 @@ interface VideoOverlayProps {
     calibrationEnabled: boolean;
     autoCalibHint: string;
     autoCalibStableMs: number;
+    repCount?: number;
+    displayPhase?: string;
 }
 
 export function VideoOverlay({
@@ -16,6 +18,8 @@ export function VideoOverlay({
     calibrationEnabled,
     autoCalibHint,
     autoCalibStableMs,
+    repCount,
+    displayPhase,
 }: VideoOverlayProps) {
     return (
         <div
@@ -86,6 +90,41 @@ export function VideoOverlay({
                                 background: "rgba(232, 132, 94, 0.55)",
                             }}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Rep Counter HUD overlay */}
+            {typeof repCount === "number" && displayPhase && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: 16,
+                        right: 16,
+                        background: "rgba(10, 10, 15, 0.5)",
+                        backdropFilter: "blur(12px)",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        borderRadius: 16,
+                        padding: "16px 24px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 24,
+                        color: "var(--text)",
+                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                    }}
+                >
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Phase</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{displayPhase}</div>
+                    </div>
+                    
+                    <div style={{ width: 1, height: 40, background: "rgba(255,255,255,0.15)" }} />
+
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Reps</div>
+                        <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: -1, lineHeight: 1, color: "var(--accent)" }}>
+                            {repCount}
+                        </div>
                     </div>
                 </div>
             )}
