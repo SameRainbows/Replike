@@ -27,7 +27,7 @@ export default function HomePage() {
   };
 
   return (
-    <section className="stack" style={{ gap: 40, paddingBottom: 60, overflow: "hidden" }}>
+    <section className="stack" style={{ gap: 40, paddingBottom: 60 }}>
       {/* Hero Section */}
       <motion.header
         className="hero"

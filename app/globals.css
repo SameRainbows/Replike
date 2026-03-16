@@ -518,7 +518,7 @@ a {
 
 /* Infinite Marquee */
 .marquee-container {
-  overflow: hidden;
+  overflow-x: clip;
   white-space: nowrap;
   display: flex;
   width: 100vw;
@@ -560,12 +560,15 @@ a {
 /* Premium interactions */
 .sleek-hover {
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 .sleek-hover:hover {
   transform: translateY(-4px) scale(1.02);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
   background: var(--surface-hover);
+  z-index: 10;
+  position: relative;
 }
 
 /* ==========================================================================
