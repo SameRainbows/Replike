@@ -707,3 +707,248 @@ a {
     animation: none !important;
   }
 }
+
+/* ==========================================================================
+   MOBILE RESPONSIVE — BOTTOM NAV + TOUCH ADAPTATIONS
+   ========================================================================== */
+
+/* Bottom Navigation Bar */
+.bottom-nav {
+  display: none; /* hidden on desktop */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(10, 10, 10, 0.88);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: none;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+[data-theme="light"] .bottom-nav {
+  background: rgba(250, 248, 245, 0.9);
+  border-top-color: rgba(140, 110, 80, 0.12);
+}
+
+.bottom-nav__tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--muted);
+  padding: 8px 4px 6px;
+  transition: color 180ms var(--ease-out), background 180ms var(--ease-out);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav__tab:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="light"] .bottom-nav__tab:active {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.bottom-nav__tab--active {
+  color: var(--accent);
+}
+
+.bottom-nav__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.bottom-nav__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+
+/* Mobile breakpoint: phones & touch tablets */
+@media (max-width: 768px) {
+  /* Show bottom nav */
+  .bottom-nav {
+    display: flex;
+  }
+
+  /* Hide desktop nav links — keep brand visible in top bar */
+  .nav__links {
+    display: none;
+  }
+
+  /* Extra padding below main content so it doesn't hide behind bottom nav */
+  .app__main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Footer not needed — bottom nav covers navigation */
+  .footer {
+    display: none;
+  }
+
+  /* Hero text scales down on small screens */
+  .hero__title {
+    font-size: clamp(2rem, 7vw, 3rem);
+  }
+
+  /* Larger container padding for comfortable thumb reach */
+  .container {
+    padding: 0 20px;
+  }
+
+  /* Single-column grid on phone */
+  .grid,
+  .grid--2,
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tighter card padding on mobile */
+  .card {
+    padding: 12px;
+  }
+
+  /* Toast moves up above bottom nav */
+  .toast {
+    bottom: calc(72px + 12px);
+    right: 16px;
+    left: 16px;
+    max-width: 100%;
+  }
+
+  /* Modal cards use full width */
+  .modalCard {
+    width: min(96vw, 680px);
+  }
+
+  /* Workout controls go single column on mobile */
+  .workout-controls-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Marquee font a bit smaller on phone */
+  .marquee-item {
+    font-size: 1rem;
+  }
+}
+
+/* Touch-specific tweaks (pointer:coarse = touch screens of any size) */
+@media (pointer: coarse) {
+  /* Disable hover lift effects on touch — avoids sticky states */
+  .sleek-hover:hover {
+    transform: none;
+    box-shadow: none;
+    background: var(--surface);
+  }
+
+  /* Bigger tap targets for all buttons */
+  .btn {
+    min-height: 48px;
+    padding: 0 18px;
+  }
+
+  /* Bigger tap targets for nav links (desktop tablet scenario) */
+  .nav__link {
+    padding: 10px 14px;
+  }
+
+  /* Dropdowns / selects easier to thumb-tap */
+  select {
+    min-height: 48px;
+  }
+}
+
+/* ==========================================================================
+   REP HUD — inside the camera VideoOverlay
+   ========================================================================== */
+
+.rep-hud {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(10, 10, 15, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #ededec;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.rep-hud__section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.rep-hud__label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.rep-hud__phase {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rep-hud__divider {
+  width: 1px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.rep-hud__count {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+/* On mobile: move HUD to bottom-left so it doesn't overlap calib indicator */
+@media (max-width: 768px) {
+  .rep-hud {
+    top: auto;
+    right: auto;
+    bottom: 12px;
+    left: 12px;
+    padding: 10px 16px;
+    gap: 14px;
+    border-radius: 12px;
+  }
+
+  .rep-hud__count {
+    font-size: 36px;
+  }
+
+  .rep-hud__phase {
+    font-size: 15px;
+  }
+
+  .rep-hud__divider {
+    height: 28px;
+  }
+}

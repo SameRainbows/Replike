@@ -2,6 +2,7 @@ import NavBar from "@/app/components/NavBar";
 import { OnboardingModal } from "@/app/components/OnboardingModal";
 import { ThemeProvider } from "@/app/components/ThemeProvider";
 import { AdvancedNebula } from "@/app/components/AdvancedNebula";
+import { BottomNav } from "@/app/components/BottomNav";
 
 export default function AppShell({
   children,
@@ -23,6 +24,7 @@ export default function AppShell({
       </footer>
       <OnboardingModal />
       <AdvancedNebula />
+      <BottomNav />
     </div>
   );
 }
